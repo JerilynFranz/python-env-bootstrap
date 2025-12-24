@@ -47,14 +47,13 @@ with the appropriate path to the script.
 That's it. That's everything.
 
 The copy of the script here is configured to install `tox <https://tox.wiki/en/latest/>`_
-and `uv <https://docs.astral.sh/uv/>`_.
-
-But you can use it to setup anything installable via pip. 
+and `uv <https://docs.astral.sh/uv/>`_ but you can easily use it to setup
+anything installable via pip. 
 
 .. note::
 
-   If you use it to install 'uv', it will bootstrap `uv` first and use it to
-   install everything else much faster than pip does (highly recommended).
+   If you use it to install ``uv``, it will bootstrap ``uv`` first and use it to
+   install everything else much faster than ``pip`` does (highly recommended).
 
 It does not try to be a build system or a project kickstarter. It does one thing
 and does it pretty well: Get the environment for the developer up and running.
