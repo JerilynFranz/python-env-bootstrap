@@ -26,9 +26,10 @@ It performs this installation to a virtual environment so as to prevent messing 
 developer's own local environment.
 
 
-You use it by copying the `bootstrap.py <https://github.com/JerilynFranz/python-env-bootstrap/blob/main/scripts/bootstrap.py>`_ standalone script
-into your own project and updating the `POST_INSTALL_MESSAGE` string, the `TOOL_USAGE_INSTRUCTIONS` string, and the `BOOTSTRAP_MODULES` list
-of :class:`InstallSpec` instances to match your project's PyPI modules environment requirements.
+You use it by copying the `bootstrap.py <bootstrap.py>`_ standalone script
+into your own project's repository and updating the `POST_INSTALL_MESSAGE` string,
+the `TOOL_USAGE_INSTRUCTIONS` string, and the `BOOTSTRAP_MODULES` list
+of `InstallSpec` instances to match your project's PyPI modules environment requirements.
 
 It has no external dependencies except that it requires at least Python 3.8.
 
