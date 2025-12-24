@@ -4,7 +4,7 @@ python-env-bootstrap
 A zero-dependency script skeleton for bootstrapping a developer's environment for onboarding to an existing Python project.
 
 Designed to work with Python 3.8 or later, it handles the bootstrapping of the tooling and modules environment for developing
-in a project without any dependences except for Python's native libraries and network access.
+in a project without any dependencies except for Python's built-in libraries and network access.
 
 .. note:: It **DOES NOT** setup a new project
 
@@ -15,13 +15,33 @@ It performs the setup of the *environment* for development of an existing projec
 by first checking whether a developer's existing environment is already setup
 with all the tools and PyPI modules needed to develop in the project.
 
-If the environemtnt is already setup appropriately, it does not change anything and just exits.
+If the environment is already setup appropriately, it does not change anything and just exits,
+letting the developer know they are good to go.
 
 If their environment *does not* meet the requirements for project development it
 creates a virtual environment and performs the bootstrap installation of all required
 tooling from PyPI.
 
 It performs this installation to a virtual environment so as to prevent messing up the
-developer's own environment.
+developer's own local environment.
 
-That's it. That's what it does.
+
+You use it by copying the `bootstrap.py <https://github.com/JerilynFranz/python-env-bootstrap/blob/main/scripts/bootstrap.py>`_ standalone script
+into your own project and updating the `POST_INSTALL_MESSAGE` string, the `TOOL_USAGE_INSTRUCTIONS` string, and the `BOOTSTRAP_MODULES` list
+of :class:`InstallSpec` instances to match your project's PyPI modules environment requirements.
+
+It has no external dependencies except that it requires at least Python 3.8.
+
+
+To setup an environment you just run
+
+.. code-block:: shell
+
+  python3 bootstrap.py
+
+
+with the appropriate path to the script.
+
+
+That's it. That's everything.
+
