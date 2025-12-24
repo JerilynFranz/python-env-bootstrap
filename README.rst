@@ -57,8 +57,9 @@ Why not just use pip -r requirements.txt?
 
 1. That may not work at all depending on a user's already existing environment. Depending on their system, the version of Python installed, 
    the version of pip on their system, pre-existing and possibly conflicting module requirements, it can easily fail. It is simple, but not very robust
-   in the face of the diversity of systems that developers use. It can easily become a case of 'well, it works on *my* system...'
+   in the face of the diversity of systems that developers use. It can easily become a case of 'well, it works on *my* system...'. While it *sounds* simple,
+   in practice it can be much less so.
 2. If it **DOES** work, it may mess up their existing local user or even system environment so that things other than your project now have problems.
 3. It is simply cleaner to not 'dirty up' a developer's environment with every package from every project they've worked on ever used. It tries to be
-   a 'good neighbor' by not installing things at all if they already meet the requirements and installing them into a virtual environment if they do need
-   stuff installed.
+   a 'good neighbor' by not installing things at all if they already meet the requirements and automatically installing stuff into a virtual environment
+   if they do need stuff installed.
