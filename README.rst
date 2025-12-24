@@ -52,7 +52,8 @@ But you can literally use it to setup anything installable via pip. If you use i
 else (highly recommended).
 
 It does not try to be a build system or a project kickstarter. It does one thing and does it pretty well: Get the environment for the developer up and running.
-If you need additional things done such as running post-environment install actions, they are easily added to it using the 'run_command' function.
+If you need additional things done such as running post-environment install actions, they are easily added to it using the 'run_command' function so as to
+keep the 'one-stop-setup' vibe.
 
 
 Why not just use pip -r requirements.txt?
