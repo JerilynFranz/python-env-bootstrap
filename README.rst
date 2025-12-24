@@ -56,14 +56,25 @@ If you need additional things done such as running post-environment install acti
 keep the 'one-stop-setup' vibe.
 
 
-Why not just use pip -r requirements.txt?
------------------------------------------
+Why not just use `pip -r requirements.txt`?
+-------------------------------------------
 
-1. That may not work at all depending on a user's already existing environment. Depending on their system, the version of Python installed, 
-   the version of pip on their system, pre-existing and possibly conflicting module requirements, it can easily fail. It is simple, but not very robust
+1. It may not work at all depending on a user's already existing environment. Depending on their system, the version of Python installed, 
+   the version of pip on their system, pre-existing and possibly conflicting module requirements from other projects, it can easily fail. It is simple, but not very robust
    in the face of the diversity of systems that developers use. It can easily become a case of 'well, it works on *my* system...'. While it *sounds* simple,
    in practice it can be much less so.
 2. If it **DOES** work, it may mess up their existing local user or even system environment so that things other than your project now have problems.
 3. It is simply cleaner to not 'dirty up' a developer's environment with every package from every project they've worked on ever used. It tries to be
    a 'good neighbor' by not installing things at all if they already meet the requirements and automatically installing stuff into a virtual environment
    if they do need stuff installed.
+
+In some degree it is just a matter of taste.
+
+I like the 'run exactly one thing' to completely setup an environment approach. Using requirements.txt takes running *at least* three things to do it
+safely and reliably (creating a virtual environment, activating the virtual environment, then runnning pip -r requirements.txt) and
+possibly more steps depending on the complexity of the environment. 
+
+And it takes work to make the instructions and/or scripts for doing that robust across different OS platforms, system constraints, and python versions.
+
+So why not make it *one* step that does it all without making anyone think much about what is happening 'under the hood' to get there?
+
