@@ -1,7 +1,7 @@
 python-env-bootstrap
 ====================
 
-A zero-dependency script skeleton for bootstrapping a developer's environment for onboarding to an existing Python project.
+A zero-dependency script skeleton for robustly bootstrapping a developer's environment for onboarding to an existing Python project.
 
 Designed to work with Python 3.8 or later, it handles the bootstrapping of the tooling and modules environment for developing
 in a project without any dependencies except for Python's built-in libraries and network access.
