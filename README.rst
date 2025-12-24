@@ -67,6 +67,8 @@ Why not just use `pip -r requirements.txt`?
 3. It is simply cleaner to not 'dirty up' a developer's environment with every package from every project they've worked on ever used. It tries to be
    a 'good neighbor' by not installing things at all if they already meet the requirements and automatically installing stuff into a virtual environment
    if they do need stuff installed.
+4. If you make `uv` one of your configured dependencies the script automatically installs it first and then uses `uv` to install everything else much
+   faster than `pip` itself does.
 
 In some degree it is just a matter of taste.
 
