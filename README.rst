@@ -46,7 +46,7 @@ with the appropriate path to the script.
 
 That's it. That's everything.
 
-The copy of the script here is setup to install `tox <https://tox.wiki/en/latest/>`_ and `uv <https://docs.astral.sh/uv/>`_ as needed.
+The copy of the script here is setup to install `tox <https://tox.wiki/en/latest/>`_ and `uv <https://docs.astral.sh/uv/>`_.
 
 But you can literally use it to setup anything installable via pip. If you use it to install 'uv', it will bootstrap `uv` first and use to to install everything
 else (highly recommended).
