@@ -1,17 +1,30 @@
-"""Bootstrap script to set up a Python development environment.
+"""Zero-dependency, cross-platform bootstrap script to set up a Python development environment.
 
-It is designed to be run after cloning the repository, to ensure that
+It is designed to be run after cloning a git repository, to ensure that
 all necessary development tools for working with this project are installed.
 
-If the required tools are not found in the system environment,
+It relies only on the Python standard library and network access to PyPI.
+
+If the required python tools are not found in the system environment,
 the script creates a local virtual environment in the git repository
 root directory (in a folder named `.venv`) and installs the tools there.
 
-If the necessary tools are already installed in the system environment, no action is taken.
+If the necessary tools are already installed in the system environment,
+no action is taken.
+
+Requires Python 3.8 or later.
+
+This does not mean that it will use Python 3.8 for development; the virtual
+environment can use any Python version installed on the system and any
+modules and versions that support that Python version.
+
+It only means that the bootstrap script itself needs at least Python 3.8 to run,
+due to its use of certain language features.
 """
 # pylint: disable=wrong-import-position
 import sys
 
+# Check for minimum Python version
 if sys.version_info < (3, 8):
     major, minor = sys.version_info.major, sys.version_info.minor
     print(f"Error: Python 3.8 or later is required to run this script. You are using Python {major}.{minor}.")
@@ -239,24 +252,6 @@ def run_command(command: List[Union[str, Path]], check=True, **kwargs):
         sys.exit(e.returncode)
 
 
-def check_requirements() -> None:
-    """Checks that required system dependencies are available.
-
-    If any are missing, prints an error message and exits the script.
-    Currently checks for 'git' command.
-    """
-    try:
-        if DEBUG:
-            print("DEBUG: Running 'git --version' to check for git availability")
-        subprocess.run(['git', '--version'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    except FileNotFoundError:
-        print("Error: 'git' command not found. Please install Git and ensure it is in your PATH.")
-        sys.exit(1)
-    except subprocess.CalledProcessError:
-        print("Error: 'git' command is not functioning properly.")
-        sys.exit(1)
-
-
 def modules_already_installed(python_exe: Path, modules: List[InstallSpec]) -> bool:
     """Checks if the required modules are already installed in the system environment.
 
@@ -334,6 +329,9 @@ def get_git_root() -> Path:
     """Finds the root directory of the git repository and caches the result.
 
     If not in a git repository, prints an error message and exits.
+
+    It tries to use 'git rev-parse --show-toplevel' first, and falls back
+    to searching parent directories for a '.git' folder if the git command is not found.
     """
     try:
         git_root_bytes = subprocess.check_output(
@@ -343,7 +341,13 @@ def get_git_root() -> Path:
         git_root = Path(git_root_bytes.decode('utf-8').strip())
         return git_root
     except FileNotFoundError:
-        print("Error: 'git' command not found. Please install Git and ensure it is in your PATH.")
+        # No git command found...so we do it the hard way
+        current_dir = Path.cwd()
+        for parent in [current_dir] + list(current_dir.parents):
+            if (parent / ".git").is_dir():
+                return parent
+
+        print("Error: .git directory not found in any parent directories.")
         sys.exit(1)
     except subprocess.CalledProcessError:
         print("Error: This does not appear to be a git repository. "
@@ -404,17 +408,17 @@ def create_virtual_environment(venv_dir: Path, python_exe: Path) -> None:
         print("---> Ensuring pip CLI script is installed in the virtual environment...")
         run_command([python_exe, "-m", "ensurepip", "--upgrade"])
 
-        print("---> Upgrading pip, setuptools, and wheel in the virtual environment to latest versions...")
+        print("---> Upgrading pip in the virtual environment to latest version...")
         if not pip_module_is_available(python_exe):
             pip_path = venv_dir / "Scripts" / "pip.exe" if _is_windows() else venv_dir / "bin" / "pip"
             if not pip_path.exists():
                 print("Error: 'pip' is not available in the virtual environment after ensurepip.")
                 print("Please check your Python installation.")
                 sys.exit(1)
-            run_command([pip_path, "install", "--upgrade", "pip", "setuptools", "wheel"])
+            run_command([pip_path, "install", "--upgrade", "pip"])
         else:
             run_command([
-                python_exe, "-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel", "--require-virtualenv"])
+                python_exe, "-m", "pip", "install", "--upgrade", "pip", "--require-virtualenv"])
     else:
         print(f"Virtual environment '{venv_dir}' already exists. Skipping creation.")
 
@@ -531,7 +535,6 @@ def main():
     Checks for required development tools and bootstraps a local virtual
     environment with them if necessary.
     """
-    check_requirements()
     if modules_already_installed(
             python_exe=Path(sys.executable),
             modules=BOOTSTRAP_MODULES):
