@@ -1,4 +1,5 @@
-"""Zero-dependency, cross-platform bootstrap script to set up a Python development environment.
+"""Zero-dependency, cross-platform bootstrap script to set up a Python
+development environment.
 
 It is designed to be run after cloning a git repository, to ensure that
 all necessary development tools for working with this project are installed.
@@ -18,8 +19,8 @@ This does not mean that it will use Python 3.8 for development; the virtual
 environment can use any Python version installed on the system and any
 modules and versions that support that Python version.
 
-It only means that the bootstrap script itself needs at least Python 3.8 to run,
-due to its use of certain language features.
+It only means that the bootstrap script itself needs at least Python 3.8 to
+run, due to its use of certain language features.
 """
 # pylint: disable=wrong-import-position
 import sys
@@ -27,7 +28,8 @@ import sys
 # Check for minimum Python version
 if sys.version_info < (3, 8):
     major, minor = sys.version_info.major, sys.version_info.minor
-    print(f"Error: Python 3.8 or later is required to run this script. You are using Python {major}.{minor}.")
+    print("Error: Python 3.8 or later is required to run this script. "
+          f"You are using Python {major}.{minor}.")
     sys.exit(2)
 
 import os
@@ -162,7 +164,8 @@ def _validate_module_list(modules: List[InstallSpec], name: str) -> None:
         raise TypeError(f"{name} must be a list")
     for module in modules:
         if not isinstance(module, InstallSpec):
-            raise TypeError(f"all items in {name} must be InstallSpec instances")
+            raise TypeError(
+                f"all items in {name} must be InstallSpec instances")
 
 
 def _validate_command(lst: List[Union[str, Path]], name: str) -> None:
