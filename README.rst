@@ -46,3 +46,6 @@ with the appropriate path to the script.
 
 That's it. That's everything.
 
+The version of the script here is setup to install 'tox' and 'uv' if needed. But you can
+literally use it to setup anything installable from PyPI.
+
