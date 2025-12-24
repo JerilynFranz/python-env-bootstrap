@@ -1,22 +1,28 @@
 python-env-bootstrap
 ====================
 
-A zero-dependency script skeleton for robustly bootstrapping a developer's environment for onboarding to an existing Python project.
+A zero-dependency script skeleton for robustly bootstrapping a developer's
+environment for onboarding to an existing Python project.
 
-Designed to work with Python 3.8 or later, it handles the bootstrapping of the tooling and modules environment for developing
-in a project without any dependencies except for Python's built-in libraries and network access.
+Designed to work with Python 3.8 or later, it handles the bootstrapping of
+the tooling and modules environment for developing in a project without any
+dependencies except for Python's built-in libraries and network access.
+
+It automatically creates a virtual environment if needed, and installs
+all required PyPI modules into that virtual environment while handling
+common issues such as platform, Python version, and pip version differences.
 
 .. note:: It **DOES NOT** setup a new project
 
-  It is NOT for creating a new Python project - it is for onboarding a developer
+  It is NOT for creating a new Python project - it is just for onboarding a developer
   to an existing project.
 
 It performs the setup of the *environment* for development of an existing project 
 by first checking whether a developer's existing environment is already setup
 with all the tools and PyPI modules needed to develop in the project.
 
-If the environment is already setup appropriately, it does not change anything and just exits,
-letting the developer know they are good to go.
+If the environment is already setup appropriately, it does not change anything
+and just exits, letting the developer know they are good to go.
 
 If their environment *does not* meet the requirements for project development it
 creates a virtual environment and performs the bootstrap installation of all required
@@ -25,7 +31,6 @@ tooling from PyPI.
 It performs this installation to a virtual environment so as to prevent messing up the
 developer's own local environment.
 
-
 You use it by copying the `bootstrap.py <bootstrap.py>`_ standalone script
 into your own project's repository and updating the `POST_INSTALL_MESSAGE` string,
 the `TOOL_USAGE_INSTRUCTIONS` string, and the `BOOTSTRAP_MODULES` list
@@ -33,42 +38,45 @@ of `InstallSpec` instances to match your project's PyPI modules environment requ
 
 It has no external dependencies except that it requires at least Python 3.8.
 
-
 To setup an environment you just run
 
 .. code-block:: shell
 
   python3 bootstrap.py
 
-
 with the appropriate path to the script.
-
 
 That's it. That's everything.
 
-The copy of the script here is setup to install `tox <https://tox.wiki/en/latest/>`_ and `uv <https://docs.astral.sh/uv/>`_.
+The copy of the script here is setup to install `tox <https://tox.wiki/en/latest/>`_
+and `uv <https://docs.astral.sh/uv/>`_.
 
-But you can literally use it to setup anything installable via pip. If you use it to install 'uv', it will bootstrap `uv` first and use to to install everything
-else (highly recommended).
+But you can literally use it to setup anything installable via pip. If you use it to
+install 'uv', it will bootstrap `uv` first and use it to install everything
+else much faster than pip does (highly recommended).
 
-It does not try to be a build system or a project kickstarter. It does one thing and does it pretty well: Get the environment for the developer up and running.
-If you need additional things done such as running post-environment install actions, they are easily added to it using the 'run_command' function so as to
+It does not try to be a build system or a project kickstarter. It does one thing
+and does it pretty well: Get the environment for the developer up and running.
+If you need additional things done such as running post-environment install actions,
+they are easily added to it using the 'run_command' function so as to
 keep the 'one-stop-setup' vibe.
-
 
 Why not just use `pip -r requirements.txt`?
 -------------------------------------------
 
 In some degree it is just a matter of taste.
 
-I like the 'run exactly one thing' to completely setup an environment approach. Using requirements.txt takes running *at least* three things to do it
-safely and reliably (creating a virtual environment, activating the virtual environment, then runnning pip -r requirements.txt) and
+I like the 'run just one thing' to completely setup an environment approach.
+
+Using requirements.txt takes running *at least* three things to do it
+safely and reliably (creating a virtual environment, activating the virtual
+environment, then runnning pip -r requirements.txt) and
 possibly more steps depending on the complexity of the environment. 
 
-And it takes work to make the instructions and/or scripts for doing that robust across different OS platforms, system constraints, and python versions.
+And it takes work to make the instructions and/or scripts for doing that
+robust across different OS platforms, system constraints, and python versions.
 
-So why not make it *one* step that does it all without making anyone think much about what is happening 'under the hood' to get there?
+So why not make it *one* step that does it all efficiently without making anyone
+think much about what is happening 'under the hood' to get there?
 
 But if you don't see it as a big thing, that's cool too :)
-
-
