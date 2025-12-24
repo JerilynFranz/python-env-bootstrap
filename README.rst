@@ -59,4 +59,5 @@ Why not just use pip -r requirements.txt?
    the version of pip on their system, pre-existing and possibly conflicting module requirements, it can easily fail. It is simple, but not very robust
    in the face of the diversity of systems that developers use. It can easily become a case of 'well, it works on *my* system...'
 2. If it **DOES** work, it may mess up their existing local user or even system environment so that things other than your project now have problems.
-3. It is simply cleaner to not 'dirty up' a developer's environment with every package from every project they've worked on ever used.
+3. It is simply cleaner to not 'dirty up' a developer's environment with every package from every project they've worked on ever used. It tries to be
+   a 'good neighbor' by not installing things at all if they are not needed and installing them into a virtual environment if they are.
