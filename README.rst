@@ -4,11 +4,19 @@ python-env-bootstrap
 A zero-dependency script skeleton for robustly bootstrapping a developer's
 environment for onboarding to an existing Python project.
 
+Who is this for?
+-------------------
+This is for Python project maintainers who want to make it as easy as possible
+for new developers to get their development environment setup and ready to go
+with as little friction as possible.
+
+Overview
+--------
 Designed to work with Python 3.8 or later, it handles the bootstrapping of
 the tooling and modules environment for developing in a project without any
 dependencies except for Python's built-in libraries and network access.
 
-It automatically creates a virtual environment if needed, and installs
+It automatically creates a virtual environment and installs
 all required PyPI modules into that virtual environment while handling
 common issues such as platform, Python version, and pip version differences.
 
@@ -16,10 +24,6 @@ common issues such as platform, Python version, and pip version differences.
 
   It is NOT for creating a new Python project - it is just for onboarding a developer
   to an existing project.
-
-It performs the setup of the *environment* for development of an existing project 
-by first checking whether a developer's existing environment is already setup
-with all the tools and PyPI modules needed to develop in the project.
 
 If the environment is already setup appropriately, it does not change anything
 and just exits, letting the developer know they are good to go.
@@ -30,6 +34,10 @@ tooling from PyPI.
 
 It performs this installation to a virtual environment so as to prevent messing up the
 developer's own local environment.
+
+
+Customization and Usage
+-----------------------
 
 You use it by copying the `bootstrap.py <bootstrap.py>`_ standalone script
 into your own project's repository and updating the `POST_INSTALL_MESSAGE` string,
@@ -48,11 +56,14 @@ with the appropriate path to the script.
 
 That's it. That's everything.
 
-The copy of the script here is setup to install `tox <https://tox.wiki/en/latest/>`_
+The copy of the script here is configured to install `tox <https://tox.wiki/en/latest/>`_
 and `uv <https://docs.astral.sh/uv/>`_.
 
-But you can literally use it to setup anything installable via pip. If you use it to
-install 'uv', it will bootstrap `uv` first and use it to install everything
+But you can use it to setup anything installable via pip. 
+
+.. note:
+
+If you use it to install 'uv', it will bootstrap `uv` first and use it to install everything
 else much faster than pip does (highly recommended).
 
 It does not try to be a build system or a project kickstarter. It does one thing
