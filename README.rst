@@ -50,3 +50,13 @@ The copy of the script here is setup to install `tox <https://tox.wiki/en/latest
 
 But you can literally use it to setup anything installable via pip. If you use it to install 'uv', it will bootstrap `uv` first and use to to install everything
 else (highly recommended).
+
+
+Why not just use pip -r requirements.txt?
+-----------------------------------------
+
+1. That may not work at all depending on a user's already existing environment. Depending on their system, the version of Python installed, 
+   the version of pip on their system, pre-existing and possibly conflicting module requirements, it can easily fail. It is simple, but not very robust
+   in the face of the diversity of systems that developers use. It can easily become a case of 'well, it works on *my* system...'
+2. If it **DOES** work, it may mess up their existing local user or even system environment so that things other than your project now have problems.
+3. It is simply cleaner to not 'dirty up' a developer's environment with every package every project they've worked on used.
