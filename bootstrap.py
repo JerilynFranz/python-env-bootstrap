@@ -1,10 +1,21 @@
 """Zero-dependency, cross-platform bootstrap script to set up a Python
 development environment.
 
+License
+-------
+
+Licensed under the Apache License, Version 2.0 (SPDX-License-Identifier: Apache-2.0)
+https://www.apache.org/licenses/LICENSE-2.0.txt
+Copyright [2025] Jerilyn Franz
+
+See https://github.com/JerilynFranz/python-env-bootstrap/blob/main/LICENSE
+for details.
+
 You can get the most recent version of this script for your own use
 in a project at https://github.com/JerilynFranz/python-env-bootstrap
 
-It is licensed under the Apache License, Version 2.0.
+Description
+-----------
 
 It is designed to be run after cloning a git or Mercurial repository, to create
 a local virtual environment (.venvtools), and install necessary development tools.
@@ -36,7 +47,8 @@ The choices of installing 'uv' and 'tox' for the bootstrap are just examples;
 you can modify the BOOTSTRAP_MODULES list to only include any packages you need
 for your development bootstrap workflow.
 
-Settable Options:
+Settable Options
+----------------
 
 - VENV_DIR: The name of the virtual environment directory to create.
 - BOOTSTRAP_MODULES: A list of InstallSpec instances specifying the packages
@@ -51,10 +63,13 @@ Settable Options:
 - You can configure the supported Python versions by modifying
   the version check ("if sys.version_info") at the start of the script.
 
-Usage:
-    python bootstrap.py
+Usage
+-----
 
-CLI Help:
+python bootstrap.py [-h] [--yes] [--debug | --no-debug] [-q | -v]
+
+CLI Help
+--------
   -h, --help     show this help message and exit
   --yes, -y      Automatically confirm and proceed without prompting.
   --debug        Enable debug output.
