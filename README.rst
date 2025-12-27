@@ -111,6 +111,14 @@ Contributions are welcome! Please feel free to open issues or submit pull reques
 on the GitHub repository.
 
 To initialize a development environment for contributing to this project,
-clone the repository and run the `bootstrap.py <bootstrap.py>`_ script.
+clone the repository and run `bootstrap.py <bootstrap.py>`_ script
+and then activate the created virtual environment:
+
+.. code-block:: shell
+
+   git clone https://github.com/JerilynFranz/python-env-bootstrap
+   cd python-env-bootstrap
+   python3 bootstrap.py
+   source env/bin/activate  # On Windows use `env\Scripts\activate`
 
 Yes. It's that simple.
