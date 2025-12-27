@@ -85,15 +85,21 @@ It is designed to be a single script that you can run to get everything
 set up without having to worry about whether `pip` is installed,
 whether the right version of Python is being used, whether the virtual
 environment is activated, whether the right platform-specific issues
-are handled, etc.
+are handled, installation order of dependencies, etc. It works
+with requirements.txt files under the hood if you want to use them,
+but it abstracts away all the common issues that come up when
+setting up a Python development environment.
 
 I like the 'run just one thing' approach to completely setup a developer's environment.
 
 This script handles a lot of the common issues that come up when
 setting up a Python development environment such as:
+
 - Creating and managing a virtual environment automatically
 - Handling platform differences (Windows vs Unix-like)
 - Handling different Python versions
 - Ensuring pip is up to date before installing anything
 - Optionally using `uv <https://docs.astral.sh/uv/>`_ to speed up installations
 - Providing clear and actionable error messages when things go wrong
+- Customizable post-install messages and instructions
+- Minimal dependencies (only requires Python 3.8+)
