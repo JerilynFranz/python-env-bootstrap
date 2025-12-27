@@ -44,6 +44,18 @@ To setup an environment you just run
 
 with the appropriate path to the script.
 
+It has sensible defaults for virtual environment location,
+module versions, and other settings but you can customize them
+by modifying the constants at the top of the script.
+
+It has the following command-line options:
+- `-h, --help` : Show help message and exit.
+- `--yes, -y` : Automatically confirm and proceed without prompting.
+- `--debug` : Enable debug output.
+- `--no-debug` : Disable debug output.
+- `-q, --quiet` : Suppress non-error output.
+- `-v, --verbose` : Enable verbose output (default).
+
 That's it. That's everything.
 
 The copy of the script here is configured to install `tox <https://tox.wiki/en/latest/>`_
@@ -64,19 +76,24 @@ keep the 'one-stop-setup' vibe.
 Why not just use `pip -r requirements.txt`?
 -------------------------------------------
 
-In some degree it is just a matter of taste.
+This script is not trying to replace `pip` or `requirements.txt` files.
+It is trying to complement them (not replace them) by providing
+a zero-dependency, frictionless way to get a developer's environment
+set up and ready to go with minimal effort.
 
-I like the 'run just one thing' to completely setup an environment approach.
+It is designed to be a single script that you can run to get everything
+set up without having to worry about whether `pip` is installed,
+whether the right version of Python is being used, whether the virtual
+environment is activated, whether the right platform-specific issues
+are handled, etc.
 
-Using requirements.txt takes running at least three things to do it
-safely and reliably (creating a virtual environment, activating the virtual
-environment, then runnning pip -r requirements.txt) and
-possibly more steps depending on the complexity of the environment. 
+I like the 'run just one thing' approach to completely setup a developer's environment.
 
-And it takes work to make the instructions and/or scripts for doing that
-robust across different OS platforms, system constraints, and python versions.
-
-So why not make it *one* step that does it all efficiently without making anyone
-think much about what is happening 'under the hood' to get there?
-
-But if you don't see it as a big thing, that's cool too :)
+This script handles a lot of the common issues that come up when
+setting up a Python development environment such as:
+- Creating and managing a virtual environment automatically
+- Handling platform differences (Windows vs Unix-like)
+- Handling different Python versions
+- Ensuring pip is up to date before installing anything
+- Optionally using `uv <https://docs.astral.sh/uv/>`_ to speed up installations
+- Providing clear and actionable error messages when things go wrong

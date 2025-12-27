@@ -1,14 +1,22 @@
 """Zero-dependency, cross-platform bootstrap script to set up a Python
 development environment.
 
+You can get the most recent version of this script for your own use
+in a project at https://github.com/JerilynFranz/python-env-bootstrap
+
+It is licensed under the Apache License, Version 2.0.
+
 It is designed to be run after cloning a git or Mercurial repository, to create
-a local virtual environment (.venvtools), install necessary development tools.
+a local virtual environment (.venvtools), and install necessary development tools.
 
 It relies only on the Python standard library and network access to PyPI and
 does not require any pre-installed packages or change your system Python installation.
 
 This example project requires Python 3.10 or later, so this script
-also checks the Python version meets that requirement before proceeding.
+checks the Python version meets that requirement before proceeding.
+
+The minimum Python version can be changed as needed for your project and
+the lowest supported version is Python 3.8.
 
 This example script installs the following tools by default:
 - uv (for managing Python packages and dependencies)
@@ -28,8 +36,32 @@ The choices of installing 'uv' and 'tox' for the bootstrap are just examples;
 you can modify the BOOTSTRAP_MODULES list to only include any packages you need
 for your development bootstrap workflow.
 
+Settable Options:
+
+- VENV_DIR: The name of the virtual environment directory to create.
+- BOOTSTRAP_MODULES: A list of InstallSpec instances specifying the packages
+  to install into the virtual environment during bootstrap.
+- Post-install steps: You can customize the `run_post_install_steps()`
+  function to perform additional setup tasks after installing the core tools.
+- Output control: You can set `DEFAULT_DEBUG` and `DEFAULT_QUIET` constants
+  to control whether debug output or quiet mode is enabled by default.
+- Command-line options: You can use '--debug'/'--no-debug' and '--quiet'/'--verbose'
+  to control output verbosity when running the script.
+- Automatic confirmation: You can use '--yes'/'-y' to skip confirmation prompts.
+- You can configure the supported Python versions by modifying
+  the version check ("if sys.version_info") at the start of the script.
+
 Usage:
     python bootstrap.py
+
+CLI Help:
+  -h, --help     show this help message and exit
+  --yes, -y      Automatically confirm and proceed without prompting.
+  --debug        Enable debug output.
+  --no-debug     Disable debug output.
+  -q, --quiet    Suppress non-error output.
+  -v, --verbose  Enable verbose output (default).
+
 """
 # pylint: disable=wrong-import-position
 import sys
@@ -37,12 +69,16 @@ import sys
 # Check for minimum supported Python version before importing anything else
 # this ensures that users get a clear error message if they try to run
 # the script with an unsupported Python version.
+#
+# The minimum version of Python this bootstrap script can support is 3.8+
+# This can be changed as needed for your project.
 if sys.version_info < (3, 10):
     major, minor = sys.version_info.major, sys.version_info.minor
     print("Error: Python 3.10 or later is required to run this project. "
           f"You are using Python {major}.{minor}.")
     sys.exit(2)
 
+import argparse
 import os
 import subprocess
 from functools import lru_cache as cache
@@ -50,9 +86,20 @@ from pathlib import Path
 from typing import NamedTuple
 from venv import create as create_venv
 
-DEBUG: bool = False
-"""Enable debug output if True."""
 
+DEFAULT_DEBUG: bool = False
+"""Enable debug output only if --debug is specified.
+
+To enable debug output by default, set this to True
+and then --no-debug can be used to disable it.
+"""
+
+DEFAULT_QUIET: bool = False
+"""Suppress non-error output only if --quiet is specified.
+
+To enable quiet output by default, set this to True
+and then --verbose can be used to disable it.
+"""
 
 VENV_DIR: str = ".venvtools"
 """The name of the virtual environment directory to create in the repository root."""
@@ -151,9 +198,16 @@ the project as an editable package into the virtual environment.
 
 No changes will be made to your system install of Python.
 
-Continue? [y/n] 
+Continue? [y/n] """
 
-"""
+# --- Global flags for output control ---
+
+# These are defined here only for declaration purposes; they are actually set
+# in main() after parsing command-line arguments.
+# Changing these variables directly has no effect: Set DEFAULT_DEBUG and
+# DEFAULT_QUIET instead to change the default behavior.
+DEBUG: bool = False
+QUIET: bool = False
 
 def run_post_install_steps(python_exe: Path, root_path: Path) -> None:
     """Runs any post-installation steps required after installing tools.
@@ -174,9 +228,9 @@ def run_post_install_steps(python_exe: Path, root_path: Path) -> None:
     """
     _validate_path(python_exe, "python_exe", exists=True)
     _validate_path(root_path, "root_path", exists=True)
-    print("--> Running initial 'tox devenv -e dev' to setup and activate the development environment...")
+    controlled_print("--> Running initial 'tox devenv -e dev' to setup and activate the development environment...")
     run_command(["tox", "devenv", "-e", "dev"], cwd=root_path, check=True)
-    print("--> Installing the current project in editable mode within the development environment...")
+    controlled_print("--> Installing the current project in editable mode within the development environment...")
     run_command(["uv", "pip", "install", "-e", "."], cwd=root_path, check=True)
 
 def _is_windows() -> bool:
@@ -302,25 +356,35 @@ def run_command(command: list[str | Path], *,
             if cwd:
                 debug_kwargs['cwd'] = cwd
             print(f"DEBUG: Running {command} with kwargs: {debug_kwargs}")
+        # Suppress output if QUIET is True and not already overridden
+        if QUIET:
+            kwargs.setdefault('stdout', subprocess.DEVNULL)
+            kwargs.setdefault('stderr', subprocess.DEVNULL)
         subprocess.run(command, check=check, cwd=cwd, **kwargs)
     except FileNotFoundError:
         print(f"Error: Command '{command[0]}' not found. Is it in your PATH?")
         sys.exit(1)
     except subprocess.CalledProcessError as e:
-        print(f"Error: Command failed with exit code {e.returncode}")
+        print(f"Error: Command {command} failed with exit code {e.returncode}")
         sys.exit(e.returncode)
+
+def controlled_print(message: str) -> None:
+    """Prints a message if not in quiet mode."""
+    _validate_string(message, "message")
+    if not QUIET:
+        print(message)
 
 def confirmation_prompt(message: str) -> bool:
     """Prompts the user for confirmation to proceed."""
     try:
         repo_root = get_repo_root()
-        print(f"Current working directory: {os.getcwd()}")
-        print(f"Repository root directory: {repo_root}")
+        controlled_print(f"Current working directory: {os.getcwd()}")
+        controlled_print(f"Repository root directory: {repo_root}")
         choice = ''
         while choice.lower().strip() not in ('y', 'yes', 'n', 'no'):
             choice = input(message)
     except KeyboardInterrupt:
-        print()
+        controlled_print('')
         return False
 
     return choice.lower().strip() in ('', 'y', 'yes')
@@ -340,6 +404,7 @@ def get_repo_root() -> Path:
     by searching for a '.hg' folder instead.
     """
     try:
+        
         git_root_bytes = subprocess.check_output(
             ['git', 'rev-parse', '--show-toplevel'],
             stderr=subprocess.PIPE
@@ -365,7 +430,7 @@ def get_repo_root() -> Path:
                 if (parent / ".hg").is_dir():
                     return parent
 
-            print("Error: No Git or Mercurial repository found in any parent directories.")
+            controlled_print("Error: No Git or Mercurial repository found in any parent directories.")
             sys.exit(1)
 
 
@@ -392,15 +457,17 @@ def pip_module_is_available(python_exe: Path) -> bool:
     """
     _validate_path(python_exe, "python_exe", exists=True)
 
+    stdout = subprocess.PIPE if not QUIET else subprocess.DEVNULL
+    stderr = subprocess.PIPE if not QUIET else subprocess.DEVNULL
     try:
         if DEBUG:
-            print(f"DEBUG: Running '{python_exe} -m pip --version' to check "
+            controlled_print(f"DEBUG: Running '{python_exe} -m pip --version' to check "
                   "for pip availability")
         subprocess.run(
             [python_exe, "-m", "pip", "--version"],
             check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stdout=stdout,
+            stderr=stderr
         )
         return True
     except (FileNotFoundError, subprocess.CalledProcessError):
@@ -418,24 +485,24 @@ def create_virtual_environment(venv_dir: Path, python_exe: Path) -> None:
     _validate_path(python_exe, "python_exe", exists=False)
 
     if not venv_dir.exists():
-        print(f"Creating virtual environment in '{venv_dir}'...")
+        controlled_print(f"Creating virtual environment in '{venv_dir}'...")
         create_venv(venv_dir, with_pip=True)
-        print("---> Ensuring pip CLI script is installed in the virtual environment...")
+        controlled_print("---> Ensuring pip CLI script is installed in the virtual environment...")
         run_command([python_exe, "-m", "ensurepip", "--upgrade"])
 
-        print("---> Upgrading pip in the virtual environment to latest version...")
+        controlled_print("---> Upgrading pip in the virtual environment to latest version...")
         if not pip_module_is_available(python_exe):
             pip_path = venv_dir / "Scripts" / "pip.exe" if _is_windows() else venv_dir / "bin" / "pip"
             if not pip_path.exists():
-                print("Error: 'pip' is not available in the virtual environment after ensurepip.")
-                print("Please check your Python installation.")
+                controlled_print("Error: 'pip' is not available in the virtual environment after ensurepip.")
+                controlled_print("Please check your Python installation.")
                 sys.exit(1)
             run_command([pip_path, "install", "--upgrade", "pip"])
         else:
             run_command([
                 python_exe, "-m", "pip", "install", "--upgrade", "pip", "--require-virtualenv"])
     else:
-        print(f"Virtual environment '{venv_dir}' already exists. Skipping creation.")
+        controlled_print(f"Virtual environment '{venv_dir}' already exists. Skipping creation.")
 
 def install_tools(python_exe: Path, modules: list[InstallSpec]) -> None:
     """Installs core development tools into the virtual environment.
@@ -453,7 +520,7 @@ def install_tools(python_exe: Path, modules: list[InstallSpec]) -> None:
     if not modules:
         return
 
-    print("Installing/updating core development tools...")
+    controlled_print("Installing/updating core development tools...")
     using_uv = any(mod.name == "uv" for mod in modules)
     if using_uv:
         install_with_uv(python_exe, modules)
@@ -480,7 +547,7 @@ def install_with_uv(python_exe: Path, modules: list[InstallSpec]) -> None:
     if not other_modules:
         return
 
-    print("--> Installing remaining modules using 'uv pip'")
+    controlled_print("--> Installing remaining modules using 'uv pip'")
     command = _build_install_command(
         [python_exe, "-m", "uv", "pip"], other_modules
     )
@@ -498,9 +565,9 @@ def install_with_pip(python_exe: Path, modules: list[InstallSpec], message: str 
     _validate_string(message, "message")
 
     if message:
-        print(message)
+        controlled_print(message)
     else:
-        print("--> Installing modules using 'pip'")
+        controlled_print("--> Installing modules using 'pip'")
     command = _build_install_command([python_exe, "-m", "pip", "--require-virtualenv"], modules)
     run_command(command)
 
@@ -538,23 +605,75 @@ def print_instructions(template: str) -> None:
         activate_script = f"{VENV_DIR}\\Scripts\\activate.bat"
 
     instructions = template.format(activate=activate_script)
-    print(instructions)
+    controlled_print(instructions)
+
+
+def parse_arguments() -> argparse.Namespace:
+    """Parses command-line arguments."""
+    arg_parser = argparse.ArgumentParser(
+        description="Bootstrap the development environment by creating a "
+                    "virtual environment and installing required tools."
+    )
+    arg_parser.add_argument(
+        '--yes', '-y',
+        action='store_true',
+        help="Automatically confirm and proceed without prompting."
+    )
+
+    debug_group = arg_parser.add_mutually_exclusive_group()
+    debug_group.add_argument(
+        '--debug',
+        dest='debug',
+        action='store_true',
+        help="Enable debug output."
+    )
+    debug_group.add_argument(
+        '--no-debug',
+        dest='debug',
+        action='store_false',
+        help="Disable debug output."
+    )
+
+    # Mutually exclusive group for verbosity
+    verbosity_group = arg_parser.add_mutually_exclusive_group()
+    verbosity_group.add_argument(
+        '-q', '--quiet',
+        dest='quiet',
+        action='store_true',
+        help="Suppress non-error output."
+    )
+    verbosity_group.add_argument(
+        '-v', '--verbose',
+        dest='quiet',
+        action='store_false',
+        help="Enable verbose output (default)."
+    )
+    arg_parser.set_defaults(quiet=DEFAULT_QUIET, debug=DEFAULT_DEBUG)
+
+    return arg_parser.parse_args()
 
 def main():
     """
     Checks for required development tools and bootstraps a local virtual
     environment with them if necessary.
     """
-    if not confirmation_prompt(CONFIRMATION_PROMPT_MESSAGE):
+    args = parse_arguments()
+    global DEBUG, QUIET
+    DEBUG = args.debug
+    QUIET = args.quiet
+
+    if QUIET and not args.yes:
+        print("Note: You can use --yes/-y to skip confirmation prompts.")
+    if not args.yes and not confirmation_prompt(CONFIRMATION_PROMPT_MESSAGE):
         print("Aborted by user.")
         sys.exit(0)
 
     repo_root = get_repo_root()
 
-    print(f"--- Bootstrapping development environment (in {repo_root}) ---")
+    controlled_print(f"--- Bootstrapping development environment (in {repo_root}) ---")
 
     venv_dir = repo_root / VENV_DIR
-    python_exe: Path = path_to_venv_python(venv_dir)
+    python_exe = path_to_venv_python(venv_dir)
     create_virtual_environment(venv_dir, python_exe)
     install_tools(python_exe, BOOTSTRAP_MODULES)
     run_post_install_steps(python_exe=python_exe, root_path=repo_root)
