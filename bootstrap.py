@@ -23,7 +23,7 @@ a local virtual environment (.venvtools), and install necessary development tool
 It relies only on the Python standard library and network access to PyPI and
 does not require any pre-installed packages or change your system Python installation.
 
-This example project requires Python 3.10 or later, so this script
+This example project requires Python 3.8 or later, so this script
 checks the Python version meets that requirement before proceeding.
 
 The minimum Python version can be changed as needed for your project and
@@ -87,9 +87,9 @@ import sys
 #
 # The minimum version of Python this bootstrap script can support is 3.8+
 # This can be changed as needed for your project.
-if sys.version_info < (3, 10):
+if sys.version_info < (3, 8):
     major, minor = sys.version_info.major, sys.version_info.minor
-    print("Error: Python 3.10 or later is required to run this project. "
+    print("Error: Python 3.8 or later is required to run this project. "
           f"You are using Python {major}.{minor}.")
     sys.exit(2)
 
@@ -98,7 +98,7 @@ import os
 import subprocess
 from functools import lru_cache as cache
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, Union, Optional, List
 from venv import create as create_venv
 
 DEFAULT_DEBUG: bool = False
@@ -138,10 +138,10 @@ class InstallSpec(NamedTuple):
 
 # --- Modules to install during bootstrap ---
 
-BOOTSTRAP_MODULES: list[InstallSpec] = [
+BOOTSTRAP_MODULES: List[InstallSpec] = [
     InstallSpec(name="uv", version=">=0.9.18"),
-    InstallSpec(name="tox", version=">=4.32.0"),
-    InstallSpec(name="tox-uv", version=">=1.29.0"),
+    InstallSpec(name="tox", version=">=4.22.0"),
+    InstallSpec(name="tox-uv", version=">=1.13.1"),
 ]
 
 # --- Tool usage instructions template ---
@@ -264,10 +264,10 @@ def _validate_string(value: str, name: str) -> None:
     if not isinstance(value, str):
         raise TypeError(f"{name} must be a string")
 
-def _validate_string_list(lst: list, name: str) -> None:
+def _validate_string_list(lst: List[str], name: str) -> None:
     """Validates that the input is a list of strings.
 
-    :param lst list: The list to validate.
+    :param lst List[str]: The list to validate.
     :param name str: The name of the list (for error messages).
     :raises TypeError: If validation fails.
     """
@@ -276,10 +276,10 @@ def _validate_string_list(lst: list, name: str) -> None:
     if not all(isinstance(item, str) for item in lst):
         raise TypeError(f"all items in {name} must be strings")
 
-def _validate_module_list(modules: list[InstallSpec], name: str) -> None:
+def _validate_module_list(modules: List[InstallSpec], name: str) -> None:
     """Validates that the input is a list of InstallSpec instances.
 
-    :param modules list: The list to validate.
+    :param modules List[InstallSpec]: The list to validate.
     :param name str: The name of the list (for error messages).
     :raises TypeError: If validation fails.
     """
@@ -289,13 +289,13 @@ def _validate_module_list(modules: list[InstallSpec], name: str) -> None:
         if not isinstance(module, InstallSpec):
             raise TypeError(f"all items in {name} must be InstallSpec instances")
 
-def _validate_command(lst: list[str | Path], name: str) -> None:
+def _validate_command(lst: List[Union[str, Path]], name: str) -> None:
     """Validates that the input is a list of that starts with
     either a string or Path, and contains only strings for all other items.
 
     It must contain at least one item.
 
-    :param lst list[str | Path]: The list to validate.
+    :param lst List[Union[str, Path]]: The list to validate.
     :param name str: The name of the list (for error messages).
     :raises TypeError: If validation fails.
     """
@@ -347,18 +347,18 @@ def _validate_path(path: Path, name: str, exists: bool = False) -> None:
     if exists and not path.exists():
         raise FileNotFoundError(f"{name} does not exist: {path}")
 
-def run_command(command: list[str | Path], *,
+def run_command(command: List[Union[str, Path]], *,
                 check: bool = True,
-                cwd: str | Path | None = None,
+                cwd: Optional[Union[str, Path]] = None,
                 **kwargs):
     """Helper to run a command and print its output.
 
     If the command is not found, or returns a non-zero exit code,
     prints an error message and exits the script.
 
-    :param command list[str | Path]: The command to run as a list.
+    :param command List[Union[str, Path]]: The command to run as a list.
     :param check bool: Whether to raise an exception on non-zero exit code.
-    :param cwd str | Path | None: The working directory for the command.
+    :param cwd Optional[str, Path]: The working directory for the command.
     :param kwargs: Additional keyword arguments to pass to subprocess.run().
     """
     _validate_command(command, "command")
@@ -520,7 +520,7 @@ def create_virtual_environment(venv_dir: Path, python_exe: Path) -> None:
     else:
         controlled_print(f"Virtual environment '{venv_dir}' already exists. Skipping creation.")
 
-def install_tools(python_exe: Path, modules: list[InstallSpec]) -> None:
+def install_tools(python_exe: Path, modules: List[InstallSpec]) -> None:
     """Installs core development tools into the virtual environment.
 
     If 'uv' is specified in the modules, it is bootstrapped with pip
@@ -528,7 +528,7 @@ def install_tools(python_exe: Path, modules: list[InstallSpec]) -> None:
     falls back to 'pip' for all modules.
 
     :param python_exe Path: The path to the Python executable within the venv.
-    :param modules: A list of InstallSpec objects to install.
+    :param modules List[InstallSpec]: A list of InstallSpec objects to install.
     """
     _validate_path(python_exe, "python_exe", exists=True)
     _validate_module_list(modules, "modules")
@@ -543,17 +543,17 @@ def install_tools(python_exe: Path, modules: list[InstallSpec]) -> None:
     else:
         install_with_pip(python_exe, modules)
 
-def install_with_uv(python_exe: Path, modules: list[InstallSpec]) -> None:
+def install_with_uv(python_exe: Path, modules: List[InstallSpec]) -> None:
     """Installs 'uv' using pip, then uses 'uv' to install the specified modules.
 
     :param python_exe Path: The path to the Python executable within the venv.
-    :param modules: A list of InstallSpec objects to install.
+    :param modules List[InstallSpec]: A list of InstallSpec objects to install.
     """
     _validate_path(python_exe, "python_exe", exists=True)
     _validate_module_list(modules, "modules")
 
     uv_module: InstallSpec = [mod for mod in modules if mod.name == "uv"][0]
-    other_modules: list[InstallSpec] = [mod for mod in modules if mod.name != "uv"]
+    other_modules: List[InstallSpec] = [mod for mod in modules if mod.name != "uv"]
 
     bootstrap_message = (
         f"--> Bootstrapping 'uv' using 'pip': {uv_module}, "
@@ -569,7 +569,7 @@ def install_with_uv(python_exe: Path, modules: list[InstallSpec]) -> None:
     )
     run_command(command)
 
-def install_with_pip(python_exe: Path, modules: list[InstallSpec], message: str = '') -> None:
+def install_with_pip(python_exe: Path, modules: List[InstallSpec], message: str = '') -> None:
     """Installs the specified modules using 'pip'.
 
     :param python_exe Path: The path to the Python executable within the venv.
@@ -587,13 +587,13 @@ def install_with_pip(python_exe: Path, modules: list[InstallSpec], message: str 
     command = _build_install_command([python_exe, "-m", "pip", "--require-virtualenv"], modules)
     run_command(command)
 
-def _build_install_command(base_command: list[str | Path],
-                           modules: list[InstallSpec]) -> list[str | Path]:
+def _build_install_command(base_command: List[Union[str, Path]],
+                           modules: List[InstallSpec]) -> List[Union[str, Path]]:
     """Builds a complete installation command list for either 'pip' or 'uv pip'.
 
-    :param base_command list[str | Path]: The base command to start with (e.g., pip or uv pip).
-    :param modules: A list of InstallSpec objects to install.
-    :return: The complete command list to run.
+    :param base_command List[Union[str, Path]]: The base command to start with (e.g., pip or uv pip).
+    :param modules List[InstallSpec]: A list of InstallSpec objects to install.
+    :return List[Union[str, Path]]: The complete command list to run.
     """
     _validate_command(base_command, "base_command")
     _validate_module_list(modules, "modules")

@@ -1,7 +1,7 @@
 [project]
 name = "python-env-bootstrap"
 version = "1.0.0-beta"
-requires-python = ">=3.10"
+requires-python = ">=3.8"
 description = "Zero-dependency script for robustly bootstrapping a Python developer environment."
 authors = [
     {name = "Jerilyn Franz", email = "opensource@snowhare.com"}
@@ -11,8 +11,6 @@ maintainers = [
 ]
 readme = "README.rst"
 keywords = ["bootstrap", "developer", "environment", "setup", "python", "development"]
-license = "Apache-2.0"
-license-files = ["LICENSE*"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -38,18 +36,18 @@ Changelog = "https://github.com/JerilynFranz/python-env-bootstrap/blob/main/CHAN
 [dependency-groups]
 # Dependencies for running the test suite
 test = [
-    "pytest>=8.4.1,<9.0.0",
-    "pytest-cov>=6.2.1",
-    "coverage>=7.10.6",
+    "pytest>=7.4.1,<9.0.0",
+    "pytest-cov>=4.2.1",
+    "coverage>=6.10.6",
 ]
 
 # Dependencies for linting and code style
 lint = [
-    "flake8>=7.3.0",
+    "flake8>=6.3.0",
     "Flake8-pyproject>=1.2.4",
     "isort>=5.12.0",
-    "mypy>=1.17.1",
-    "pylint>=3.3.8",
+    "mypy>=1.13.1",
+    "pylint>=3.1.8",
     "yapf>=0.40.0",
 ]
 
@@ -67,16 +65,16 @@ tools = [
     "hatchling>=1.27",
     "mercurial>=6.1",
     "pydeps>=1.23.2",
-    "testplan>=25.8.0",
-    "tox>=4.32.0",
-    "tox-uv>=1.29.0",
+    "testplan>=22.8.0",
+    "tox>=4.22.0",
+    "tox-uv>=1.13.1",
     "uv>=0.9.18",
 ]
 
 [tool.tox]
 requires = ["tox>=4.22"]
 env_list = [ 
-    "py31{0-4}",
+    "py31{0-4},py38,py39",
     "lint",
 ]
 install_command = ["uv", "pip", "install", "{opts}", "{packages}"]
@@ -105,7 +103,7 @@ description = "Development environment with all tools"
 package = "editable"
 dependency_groups = ["test", "tools", "lint"]
 base = ["testenv"]
-base_python = ["python3.10"]
+base_python = ["python3.8", "python3.9", "python3.10", "python3.11", "python3.12", "python3.13", "python3.14"]
 allowlist_externals = ["pytest", "mypy", "flake8", "pylint"]
 
 commands = []

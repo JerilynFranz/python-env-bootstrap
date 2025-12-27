@@ -103,3 +103,14 @@ setting up a Python development environment such as:
 - Providing clear and actionable error messages when things go wrong
 - Customizable post-install messages and instructions
 - Minimal dependencies (only requires Python 3.8+)
+
+Contributing
+------------
+
+Contributions are welcome! Please feel free to open issues or submit pull requests
+on the GitHub repository.
+
+To initialize a development environment for contributing to this project,
+clone the repository and run the `bootstrap.py <bootstrap.py>`_ script.
+
+Yes. It's that simple.
