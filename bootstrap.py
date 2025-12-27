@@ -1,30 +1,45 @@
 """Zero-dependency, cross-platform bootstrap script to set up a Python
 development environment.
 
-It is designed to be run after cloning a git repository, to ensure that
-all necessary development tools for working with this project are installed.
+It is designed to be run after cloning a git or Mercurial repository, to create
+a local virtual environment (.venvtools), install necessary development tools.
 
-It relies only on the Python standard library and network access to PyPI.
+It relies only on the Python standard library and network access to PyPI and
+does not require any pre-installed packages or change your system Python installation.
 
-The script creates a local virtual environment in the git repository
-root directory (in a folder named `.venv`) and installs the tools there.
+This example project requires Python 3.10 or later, so this script
+also checks the Python version meets that requirement before proceeding.
 
-Requires Python 3.8 or later.
+This example script installs the following tools by default:
+- uv (for managing Python packages and dependencies)
+- tox (for running tests, linters, and building documentation)
+- tox-uv (to integrate uv with tox)
 
-This does not mean that it will use Python 3.8 for development; the virtual
-environment can use any Python version installed on the system and any
-modules and versions that support that Python version.
+That is the minimum set of tools required to start development for this example project.
 
-It only means that the bootstrap script itself needs at least Python 3.8 to
-run, due to its use of certain language features.
+The minimum supported Python version, virtual environment directory name,
+and list of tools to install can be customized by modifying the
+corresponding constants in this script. The script can also be extended to
+perform additional setup steps as needed via the run_post_install_steps() function
+such as installing additional packages from requirements.txt files 
+or configuring settings.
+
+The choices of installing 'uv' and 'tox' for the bootstrap are just examples;
+you can modify the BOOTSTRAP_MODULES list to only include any packages you need
+for your development bootstrap workflow.
+
+Usage:
+    python bootstrap.py
 """
 # pylint: disable=wrong-import-position
 import sys
 
-# Check for minimum Python version
-if sys.version_info < (3, 8):
+# Check for minimum supported Python version before importing anything else
+# this ensures that users get a clear error message if they try to run
+# the script with an unsupported Python version.
+if sys.version_info < (3, 10):
     major, minor = sys.version_info.major, sys.version_info.minor
-    print("Error: Python 3.8 or later is required to run this script. "
+    print("Error: Python 3.10 or later is required to run this project. "
           f"You are using Python {major}.{minor}.")
     sys.exit(2)
 
@@ -32,12 +47,15 @@ import os
 import subprocess
 from functools import lru_cache as cache
 from pathlib import Path
-from typing import List, NamedTuple, Union
+from typing import NamedTuple
 from venv import create as create_venv
 
 DEBUG: bool = False
 """Enable debug output if True."""
 
+
+VENV_DIR: str = ".venvtools"
+"""The name of the virtual environment directory to create in the repository root."""
 
 class InstallSpec(NamedTuple):
     """Specification for modules required to be installed.
@@ -56,7 +74,7 @@ class InstallSpec(NamedTuple):
 
 # --- Modules to install during bootstrap ---
 
-BOOTSTRAP_MODULES: List[InstallSpec] = [
+BOOTSTRAP_MODULES: list[InstallSpec] = [
     InstallSpec(name="uv", version=">=0.9.18"),
     InstallSpec(name="tox", version=">=4.32.0"),
     InstallSpec(name="tox-uv", version=">=1.29.0"),
@@ -107,7 +125,10 @@ See https://docs.astral.sh/uv/ for more information on using 'uv'.
 POST_INSTALL_MESSAGE = f"""
 --- Bootstrap complete! ---
 
-To activate the development environment, run:
+The development environment has been set up in the '{VENV_DIR}' directory,
+activated, and the project has been installed in editable mode.
+
+To activate the development virtual environment in the future, run:
 
   {{activate}}
 
@@ -118,11 +139,49 @@ To deactivate the virtual environment, run:
 {TOOL_USAGE_INSTRUCTIONS}
 """
 
+# --- Confirmation prompt message ---
+
+CONFIRMATION_PROMPT_MESSAGE = f"""
+This script will create a {VENV_DIR} directory in the root of the current
+repository.
+
+It will install required tools into it for development, activate 
+the development environment for the current session, and install
+the project as an editable package into the virtual environment.
+
+No changes will be made to your system install of Python.
+
+Continue? [y/n] 
+
+"""
+
+def run_post_install_steps(python_exe: Path, root_path: Path) -> None:
+    """Runs any post-installation steps required after installing tools.
+
+    This function is called automatically after the core development tools are installed.
+    It is intended as a customization point for project-specific setup tasks, such as:
+    - Installing the current project in editable mode
+    - Setting up pre-commit hooks
+    - Installing packages from requirements.txt files
+    - Any other project-specific initialization
+
+    The default example implementation here runs 'tox devenv -e dev' to set up and activate
+    the development environment, and then installs the current project in editable mode
+    with 'uv pip install -e .'.
+
+    :param python_exe Path: The path to the Python executable within the venv.
+    :param root_path Path: The path to the root of the repository.
+    """
+    _validate_path(python_exe, "python_exe", exists=True)
+    _validate_path(root_path, "root_path", exists=True)
+    print("--> Running initial 'tox devenv -e dev' to setup and activate the development environment...")
+    run_command(["tox", "devenv", "-e", "dev"], cwd=root_path, check=True)
+    print("--> Installing the current project in editable mode within the development environment...")
+    run_command(["uv", "pip", "install", "-e", "."], cwd=root_path, check=True)
 
 def _is_windows() -> bool:
     """Determines if the current platform is Windows."""
     return sys.platform == "win32"
-
 
 def _validate_string(value: str, name: str) -> None:
     """Validates that the input is a string.
@@ -133,7 +192,6 @@ def _validate_string(value: str, name: str) -> None:
     """
     if not isinstance(value, str):
         raise TypeError(f"{name} must be a string")
-
 
 def _validate_string_list(lst: list, name: str) -> None:
     """Validates that the input is a list of strings.
@@ -147,8 +205,7 @@ def _validate_string_list(lst: list, name: str) -> None:
     if not all(isinstance(item, str) for item in lst):
         raise TypeError(f"all items in {name} must be strings")
 
-
-def _validate_module_list(modules: List[InstallSpec], name: str) -> None:
+def _validate_module_list(modules: list[InstallSpec], name: str) -> None:
     """Validates that the input is a list of InstallSpec instances.
 
     :param modules list: The list to validate.
@@ -159,17 +216,15 @@ def _validate_module_list(modules: List[InstallSpec], name: str) -> None:
         raise TypeError(f"{name} must be a list")
     for module in modules:
         if not isinstance(module, InstallSpec):
-            raise TypeError(
-                f"all items in {name} must be InstallSpec instances")
+            raise TypeError(f"all items in {name} must be InstallSpec instances")
 
-
-def _validate_command(lst: List[Union[str, Path]], name: str) -> None:
+def _validate_command(lst: list[str | Path], name: str) -> None:
     """Validates that the input is a list of that starts with
     either a string or Path, and contains only strings for all other items.
 
     It must contain at least one item.
 
-    :param lst List[Union[str, Path]]: The list to validate.
+    :param lst list[str | Path]: The list to validate.
     :param name str: The name of the list (for error messages).
     :raises TypeError: If validation fails.
     """
@@ -182,7 +237,6 @@ def _validate_command(lst: List[Union[str, Path]], name: str) -> None:
     if not all(isinstance(item, str) for item in lst[1:]):
         raise TypeError(f"all items after the first in {name} must be strings")
 
-
 def _validate_boolean(value: bool, name: str) -> None:
     """Validates that the input is a boolean.
 
@@ -192,7 +246,6 @@ def _validate_boolean(value: bool, name: str) -> None:
     """
     if not isinstance(value, bool):
         raise TypeError(f"{name} must be a boolean")
-
 
 def _validate_kwarg_keys_are_strings(kwargs: dict, name: str) -> None:
     """Validates that all keys in the input dictionary are strings.
@@ -223,25 +276,33 @@ def _validate_path(path: Path, name: str, exists: bool = False) -> None:
     if exists and not path.exists():
         raise FileNotFoundError(f"{name} does not exist: {path}")
 
-
-def run_command(command: List[Union[str, Path]], check=True, **kwargs):
+def run_command(command: list[str | Path], *,
+                check: bool = True,
+                cwd: str | Path | None = None,
+                **kwargs):
     """Helper to run a command and print its output.
 
     If the command is not found, or returns a non-zero exit code,
     prints an error message and exits the script.
 
-    :param command List[Union[str, Path]]: The command to run as a list.
+    :param command list[str | Path]: The command to run as a list.
     :param check bool: Whether to raise an exception on non-zero exit code.
+    :param cwd str | Path | None: The working directory for the command.
     :param kwargs: Additional keyword arguments to pass to subprocess.run().
     """
     _validate_command(command, "command")
     _validate_boolean(check, "check")
+    if cwd:
+        _validate_path(Path(cwd), "cwd", exists=True)
     _validate_kwarg_keys_are_strings(kwargs, "kwargs")
 
     try:
         if DEBUG:
-            print(f"DEBUG: Running {command} with kwargs: {kwargs}")
-        subprocess.run(command, check=check, **kwargs)
+            debug_kwargs = kwargs.copy()
+            if cwd:
+                debug_kwargs['cwd'] = cwd
+            print(f"DEBUG: Running {command} with kwargs: {debug_kwargs}")
+        subprocess.run(command, check=check, cwd=cwd, **kwargs)
     except FileNotFoundError:
         print(f"Error: Command '{command[0]}' not found. Is it in your PATH?")
         sys.exit(1)
@@ -249,19 +310,15 @@ def run_command(command: List[Union[str, Path]], check=True, **kwargs):
         print(f"Error: Command failed with exit code {e.returncode}")
         sys.exit(e.returncode)
 
-
-def confirmation_prompt() -> bool:
+def confirmation_prompt(message: str) -> bool:
     """Prompts the user for confirmation to proceed."""
     try:
-        git_root = get_git_root()
+        repo_root = get_repo_root()
         print(f"Current working directory: {os.getcwd()}")
-        print(f"Git repo root directory: {git_root}")
+        print(f"Repository root directory: {repo_root}")
         choice = ''
         while choice.lower().strip() not in ('y', 'yes', 'n', 'no'):
-            choice = input(
-                "This script will create a .venv directory in the git repo "
-                "root directory and install tools into it for development. "
-                "Continue? [y/n] ")
+            choice = input(message)
     except KeyboardInterrupt:
         print()
         return False
@@ -270,39 +327,50 @@ def confirmation_prompt() -> bool:
 
 
 @cache
-def get_git_root() -> Path:
-    """Finds the root directory of the git repository and caches the result.
+def get_repo_root() -> Path:
+    """Finds the root directory of the repository and caches the result.
 
-    If not in a git repository, prints an error message and exits.
+    If not in a repository, prints an error message and exits.
 
     It tries to use 'git rev-parse --show-toplevel' first, and falls back
-    to searching parent directories for a '.git' folder if the git command is
-    not found.
+    to searching parent directories for a '.git' folder if the git command
+    is not found.
+
+    If a .git directory is not found, it looks for a Mercurial repository
+    by searching for a '.hg' folder instead.
     """
     try:
         git_root_bytes = subprocess.check_output(
             ['git', 'rev-parse', '--show-toplevel'],
             stderr=subprocess.PIPE
         )
-        git_root = Path(git_root_bytes.decode('utf-8').strip())
-        return git_root
-    except FileNotFoundError:
-        # No git command found...so we do it the hard way
-        current_dir = Path.cwd()
-        for parent in [current_dir] + list(current_dir.parents):
-            if (parent / ".git").is_dir():
-                return parent
+        return Path(git_root_bytes.decode('utf-8').strip())
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        # Try Mercurial CLI
+        try:
+            hg_root_bytes = subprocess.check_output(
+                ['hg', 'root'],
+                stderr=subprocess.PIPE
+            )
+            return Path(hg_root_bytes.decode('utf-8').strip())
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            # Fallback to directory search...
+            current_dir = Path.cwd()
+            for parent in [current_dir] + list(current_dir.parents):
+                if (parent / ".git").is_dir():
+                    return parent
+                
+            # Check for Mercurial repository instead
+            for parent in [current_dir] + list(current_dir.parents):
+                if (parent / ".hg").is_dir():
+                    return parent
 
-        print("Error: .git directory not found in any parent directories.")
-        sys.exit(1)
-    except subprocess.CalledProcessError:
-        print("Error: This does not appear to be a git repository. "
-              "Please run from within the cloned project directory.")
-        sys.exit(1)
+            print("Error: No Git or Mercurial repository found in any parent directories.")
+            sys.exit(1)
 
 
 def path_to_venv_python(venv_dir: Path) -> Path:
-    """The path to the Python executable within the virtual environment.
+    """Returns the path to the Python executable within the virtual environment.
 
     :param venv_dir Path: The directory of the virtual environment.
     :param is_windows bool: Whether the platform is Windows.
@@ -326,9 +394,8 @@ def pip_module_is_available(python_exe: Path) -> bool:
 
     try:
         if DEBUG:
-            print(
-                f"DEBUG: Running '{python_exe} -m pip --version' to check "
-                "for pip availability")
+            print(f"DEBUG: Running '{python_exe} -m pip --version' to check "
+                  "for pip availability")
         subprocess.run(
             [python_exe, "-m", "pip", "--version"],
             check=True,
@@ -353,30 +420,24 @@ def create_virtual_environment(venv_dir: Path, python_exe: Path) -> None:
     if not venv_dir.exists():
         print(f"Creating virtual environment in '{venv_dir}'...")
         create_venv(venv_dir, with_pip=True)
-        print("---> Ensuring pip CLI script is installed in the virtual "
-              "environment...")
+        print("---> Ensuring pip CLI script is installed in the virtual environment...")
         run_command([python_exe, "-m", "ensurepip", "--upgrade"])
 
-        print("---> Upgrading pip in the virtual environment to latest "
-              "version...")
+        print("---> Upgrading pip in the virtual environment to latest version...")
         if not pip_module_is_available(python_exe):
             pip_path = venv_dir / "Scripts" / "pip.exe" if _is_windows() else venv_dir / "bin" / "pip"
             if not pip_path.exists():
-                print("Error: 'pip' is not available in the virtual "
-                      "environment after ensurepip.")
+                print("Error: 'pip' is not available in the virtual environment after ensurepip.")
                 print("Please check your Python installation.")
                 sys.exit(1)
             run_command([pip_path, "install", "--upgrade", "pip"])
         else:
             run_command([
-                python_exe, "-m", "pip", "install", "--upgrade", "pip",
-                "--require-virtualenv"])
+                python_exe, "-m", "pip", "install", "--upgrade", "pip", "--require-virtualenv"])
     else:
-        print(f"Virtual environment '{venv_dir}' already exists. "
-              "Skipping creation.")
+        print(f"Virtual environment '{venv_dir}' already exists. Skipping creation.")
 
-
-def install_tools(python_exe: Path, modules: List[InstallSpec]) -> None:
+def install_tools(python_exe: Path, modules: list[InstallSpec]) -> None:
     """Installs core development tools into the virtual environment.
 
     If 'uv' is specified in the modules, it is bootstrapped with pip
@@ -399,9 +460,8 @@ def install_tools(python_exe: Path, modules: List[InstallSpec]) -> None:
     else:
         install_with_pip(python_exe, modules)
 
-
-def install_with_uv(python_exe: Path, modules: List[InstallSpec]) -> None:
-    """Installs uv using pip, then uses uv to install the specified modules.
+def install_with_uv(python_exe: Path, modules: list[InstallSpec]) -> None:
+    """Installs 'uv' using pip, then uses 'uv' to install the specified modules.
 
     :param python_exe Path: The path to the Python executable within the venv.
     :param modules: A list of InstallSpec objects to install.
@@ -410,8 +470,7 @@ def install_with_uv(python_exe: Path, modules: List[InstallSpec]) -> None:
     _validate_module_list(modules, "modules")
 
     uv_module: InstallSpec = [mod for mod in modules if mod.name == "uv"][0]
-    other_modules: List[InstallSpec] = [
-        mod for mod in modules if mod.name != "uv"]
+    other_modules: list[InstallSpec] = [mod for mod in modules if mod.name != "uv"]
 
     bootstrap_message = (
         f"--> Bootstrapping 'uv' using 'pip': {uv_module}, "
@@ -427,9 +486,7 @@ def install_with_uv(python_exe: Path, modules: List[InstallSpec]) -> None:
     )
     run_command(command)
 
-
-def install_with_pip(python_exe: Path,
-                     modules: List[InstallSpec], message: str = '') -> None:
+def install_with_pip(python_exe: Path, modules: list[InstallSpec], message: str = '') -> None:
     """Installs the specified modules using 'pip'.
 
     :param python_exe Path: The path to the Python executable within the venv.
@@ -444,17 +501,14 @@ def install_with_pip(python_exe: Path,
         print(message)
     else:
         print("--> Installing modules using 'pip'")
-    command = _build_install_command(
-        [python_exe, "-m", "pip", "--require-virtualenv"], modules)
+    command = _build_install_command([python_exe, "-m", "pip", "--require-virtualenv"], modules)
     run_command(command)
 
+def _build_install_command(base_command: list[str | Path],
+                           modules: list[InstallSpec]) -> list[str | Path]:
+    """Builds a complete installation command list for either 'pip' or 'uv pip'.
 
-def _build_install_command(base_command: List[Union[str, Path]],
-                           modules: List[InstallSpec]) -> List:
-    """Builds complete installation command list for either 'pip' or 'uv pip'
-
-    :param base_command List[Union[str, Path]]: The base command to start with
-        (e.g., pip or uv pip).
+    :param base_command list[str | Path]: The base command to start with (e.g., pip or uv pip).
     :param modules: A list of InstallSpec objects to install.
     :return: The complete command list to run.
     """
@@ -471,43 +525,40 @@ def _build_install_command(base_command: List[Union[str, Path]],
         command.append(spec_str)
     return command
 
-
 def print_instructions(template: str) -> None:
-    """Prints instructions to the user on how to activate the virtual
-    environment and use the installed tools.
+    """Prints instructions to the user on how to activate the virtual environment
+    and use the installed tools.
 
     :param template str: The instructions template to use.
     """
     _validate_string(template, "template")
 
-    activate_script = "source .venv/bin/activate"
+    activate_script = f"source {VENV_DIR}/bin/activate"
     if _is_windows():
-        activate_script = ".venv\\Scripts\\activate.bat"
+        activate_script = f"{VENV_DIR}\\Scripts\\activate.bat"
 
     instructions = template.format(activate=activate_script)
     print(instructions)
 
-
 def main():
     """
-    Bootstraps a local virtual environment with the required development tools.
-    Prompts the user for confirmation before proceeding.
-    Exits if the user aborts or if an error occurs.
+    Checks for required development tools and bootstraps a local virtual
+    environment with them if necessary.
     """
-    if not confirmation_prompt():
+    if not confirmation_prompt(CONFIRMATION_PROMPT_MESSAGE):
         print("Aborted by user.")
         sys.exit(0)
 
-    git_root = get_git_root()
+    repo_root = get_repo_root()
 
-    print(f"--- Bootstrapping development environment (in {git_root}) ---")
+    print(f"--- Bootstrapping development environment (in {repo_root}) ---")
 
-    venv_dir = git_root / ".venv"
-    python_exe = path_to_venv_python(venv_dir)
+    venv_dir = repo_root / VENV_DIR
+    python_exe: Path = path_to_venv_python(venv_dir)
     create_virtual_environment(venv_dir, python_exe)
     install_tools(python_exe, BOOTSTRAP_MODULES)
+    run_post_install_steps(python_exe=python_exe, root_path=repo_root)
     print_instructions(POST_INSTALL_MESSAGE)
-    return 0
 
 
 if __name__ == "__main__":
