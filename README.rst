@@ -119,6 +119,6 @@ and then activate the created virtual environment:
    git clone https://github.com/JerilynFranz/python-env-bootstrap
    cd python-env-bootstrap
    python3 bootstrap.py
-   source env/bin/activate  # On Windows use `env\Scripts\activate`
+   source venv/bin/activate  # On Windows use `env\Scripts\activate`
 
 Yes. It's that simple.
