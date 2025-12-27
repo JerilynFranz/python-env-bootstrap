@@ -33,7 +33,7 @@ This example script installs the following tools by default:
 - uv (for managing Python packages and dependencies)
 - tox (for running tests, linters, and building documentation)
 - tox-uv (to integrate uv with tox)
-
+ 
 That is the minimum set of tools required to start development for this example project.
 
 The minimum supported Python version, virtual environment directory name,
@@ -101,7 +101,6 @@ from pathlib import Path
 from typing import NamedTuple
 from venv import create as create_venv
 
-
 DEFAULT_DEBUG: bool = False
 """Enable debug output only if --debug is specified.
 
@@ -117,7 +116,10 @@ and then --verbose can be used to disable it.
 """
 
 VENV_DIR: str = ".venvtools"
-"""The name of the virtual environment directory to create in the repository root."""
+"""The name of the virtual environment directory to create in the repository root for the bootstrap."""
+
+ACTIVATED_VENV_DIR: str = 'venv'
+"""The name of the virtual environment directory when the project virtual environment is activated."""
 
 class InstallSpec(NamedTuple):
     """Specification for modules required to be installed.
@@ -187,10 +189,10 @@ See https://docs.astral.sh/uv/ for more information on using 'uv'.
 POST_INSTALL_MESSAGE = f"""
 --- Bootstrap complete! ---
 
-The development environment has been set up in the '{VENV_DIR}' directory,
+The development environment has been set up in the '{ACTIVATED_VENV_DIR}' directory,
 activated, and the project has been installed in editable mode.
 
-To activate the development virtual environment in the future, run:
+To activate the project's development virtual environment in the future, run:
 
   {{activate}}
 
@@ -224,7 +226,7 @@ Continue? [y/n] """
 DEBUG: bool = False
 QUIET: bool = False
 
-def run_post_install_steps(python_exe: Path, root_path: Path) -> None:
+def run_post_install_steps(python_exe: Path, root_path: Path, bin_dir: Path) -> None:
     """Runs any post-installation steps required after installing tools.
 
     This function is called automatically after the core development tools are installed.
@@ -244,9 +246,9 @@ def run_post_install_steps(python_exe: Path, root_path: Path) -> None:
     _validate_path(python_exe, "python_exe", exists=True)
     _validate_path(root_path, "root_path", exists=True)
     controlled_print("--> Running initial 'tox devenv -e dev' to setup and activate the development environment...")
-    run_command(["tox", "devenv", "-e", "dev"], cwd=root_path, check=True)
+    run_command([python_exe, str(bin_dir / "tox"), "devenv", "-e", "dev"], cwd=root_path, check=True)
     controlled_print("--> Installing the current project in editable mode within the development environment...")
-    run_command(["uv", "pip", "install", "-e", "."], cwd=root_path, check=True)
+    run_command([bin_dir / "uv", "pip", "install", "-e", "."], cwd=root_path, check=True)
 
 def _is_windows() -> bool:
     """Determines if the current platform is Windows."""
@@ -419,7 +421,6 @@ def get_repo_root() -> Path:
     by searching for a '.hg' folder instead.
     """
     try:
-        
         git_root_bytes = subprocess.check_output(
             ['git', 'rev-parse', '--show-toplevel'],
             stderr=subprocess.PIPE
@@ -439,7 +440,7 @@ def get_repo_root() -> Path:
             for parent in [current_dir] + list(current_dir.parents):
                 if (parent / ".git").is_dir():
                     return parent
-                
+
             # Check for Mercurial repository instead
             for parent in [current_dir] + list(current_dir.parents):
                 if (parent / ".hg").is_dir():
@@ -615,9 +616,9 @@ def print_instructions(template: str) -> None:
     """
     _validate_string(template, "template")
 
-    activate_script = f"source {VENV_DIR}/bin/activate"
+    activate_script = f"source {ACTIVATED_VENV_DIR}/bin/activate"
     if _is_windows():
-        activate_script = f"{VENV_DIR}\\Scripts\\activate.bat"
+        activate_script = f"{ACTIVATED_VENV_DIR}\\Scripts\\activate.bat"
 
     instructions = template.format(activate=activate_script)
     controlled_print(instructions)
@@ -673,7 +674,7 @@ def main():
     environment with them if necessary.
     """
     args = parse_arguments()
-    global DEBUG, QUIET
+    global DEBUG, QUIET  # pylint: disable=global-statement
     DEBUG = args.debug
     QUIET = args.quiet
 
@@ -691,7 +692,9 @@ def main():
     python_exe = path_to_venv_python(venv_dir)
     create_virtual_environment(venv_dir, python_exe)
     install_tools(python_exe, BOOTSTRAP_MODULES)
-    run_post_install_steps(python_exe=python_exe, root_path=repo_root)
+
+    bin_dir = venv_dir / ("Scripts" if _is_windows() else "bin")
+    run_post_install_steps(python_exe=python_exe, root_path=repo_root, bin_dir=bin_dir)
     print_instructions(POST_INSTALL_MESSAGE)
 
 

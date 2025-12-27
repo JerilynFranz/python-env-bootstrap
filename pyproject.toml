@@ -1,0 +1,131 @@
+[project]
+name = "python-env-bootstrap"
+version = "1.0.0"
+requires-python = ">=3.10"
+description = "Zero-dependency script for robustly bootstrapping a Python developer environment."
+authors = [
+    {name = "Jerilyn Franz", email = "opensource@snowhare.com"}
+]
+maintainers = [
+    {name = "Jerilyn Franz", email = "opensource@snowhare.com"}
+]
+readme = "README.rst"
+keywords = ["bootstrap", "developer", "environment", "setup", "python", "development"]
+license = "Apache-2.0"
+license-files = ["LICENSE*"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development",
+    "Topic :: Utilities"
+]
+
+[project.urls]
+Homepage = "https://github.com/JerilynFranz/python-env-bootstrap"
+Documentation = "https://python-env-bootstrap.readthedocs.io/en/latest/"
+Repository = "https://github.com/JerilynFranz/python-env-bootstrap.git"
+Issues = "https://github.com/JerilynFranz/python-env-bootstrap/issues"
+Changelog = "https://github.com/JerilynFranz/python-env-bootstrap/blob/main/CHANGELOG.rst"
+
+[dependency-groups]
+# Dependencies for running the test suite
+test = [
+    "pytest>=8.4.1,<9.0.0",
+    "pytest-cov>=6.2.1",
+    "coverage>=7.10.6",
+]
+
+# Dependencies for linting and code style
+lint = [
+    "flake8>=7.3.0",
+    "Flake8-pyproject>=1.2.4",
+    "isort>=5.12.0",
+    "mypy>=1.17.1",
+    "pylint>=3.3.8",
+    "yapf>=0.40.0",
+]
+
+# Dependencies for building documentation
+docs = [
+    "furo>=2025.09.25",
+    "sphinx>=8.2.3,<9.0.0",
+    "sphinx-copybutton>=0.5.2",
+    "sphinx-design>=0.6.1",
+]
+
+# A group for all other development tools
+tools = [
+    "hatch>=1.13",
+    "hatchling>=1.27",
+    "mercurial>=6.1",
+    "pydeps>=1.23.2",
+    "testplan>=25.8.0",
+    "tox>=4.32.0",
+    "tox-uv>=1.29.0",
+    "uv>=0.9.18",
+]
+
+[tool.tox]
+requires = ["tox>=4.22"]
+env_list = [ 
+    "py31{0-4}",
+    "lint",
+]
+install_command = ["uv", "pip", "install", "{opts}", "{packages}"]
+
+# labels table for grouping environments
+[tool.tox.labels]
+test = ["py310", "py311", "py312", "py313", "py314", "doctest", "lint"]
+
+# --- Base Test Environment for automation from env_list -
+
+[tool.tox.env_run_base]
+description = "Run test under {base_python}"
+allowlist_externals = ["pytest", "flake8", "pylint", "mypy"]
+dependency_groups = ["test", "lint", "tools", "types"]
+extras = ["all"]
+commands = [["pytest", "{posargs:tests/}"]]
+
+# --- Concrete Test Environments ---
+
+# environments table
+[tool.tox.env]
+
+# tox devenv -e dev
+[tool.tox.env.dev]
+description = "Development environment with all tools"
+package = "editable"
+dependency_groups = ["test", "tools", "lint"]
+base = ["testenv"]
+base_python = ["python3.10"]
+allowlist_externals = ["pytest", "mypy", "flake8", "pylint"]
+
+commands = []
+
+[tool.tox.env.lint]
+description = "Run linters"
+package = "skip"
+base_python = ["python3.12"]
+dependency_groups = ["lint"]
+commands = [
+    ["flake8", "src", "tests"],
+    ["pylint", "src", "tests"],
+    ["mypy", "src", "tests"],
+]
+
+[tool.tox.env.docs]
+# This environment is self-contained and does NOT inherit from basetest.
+description = "Build the documentation"
+base_python = ["python3.12"]
+dependency_groups = ["docs", "test"]
+extras = ["all"]
+allowlist_externals = ["sphinx-build"]
+commands = [["sphinx-build", "-b", "html", "documentation/", "documentation/docs"]]
