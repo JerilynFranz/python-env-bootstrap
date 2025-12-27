@@ -98,7 +98,7 @@ import os
 import subprocess
 from functools import lru_cache as cache
 from pathlib import Path
-from typing import NamedTuple, Union, Optional, List
+from typing import List, NamedTuple, Optional, Union
 from venv import create as create_venv
 
 DEFAULT_DEBUG: bool = False
@@ -190,9 +190,9 @@ POST_INSTALL_MESSAGE = f"""
 --- Bootstrap complete! ---
 
 The development environment has been set up in the '{ACTIVATED_VENV_DIR}' directory,
-activated, and the project has been installed in editable mode.
+and the project has been installed in editable mode.
 
-To activate the project's development virtual environment in the future, run:
+To activate the project's development virtual environment, run:
 
   {{activate}}
 
@@ -206,12 +206,12 @@ To deactivate the virtual environment, run:
 # --- Confirmation prompt message ---
 
 CONFIRMATION_PROMPT_MESSAGE = f"""
-This script will create a {VENV_DIR} directory in the root of the current
-repository.
+This script will create a {VENV_DIR} directory in the root
+of the current repository.
 
-It will install required tools into it for development, activate 
-the development environment for the current session, and install
-the project as an editable package into the virtual environment.
+It will install required tools into it for development, 
+and install the project as an editable package into the
+virtual environment.
 
 No changes will be made to your system install of Python.
 
