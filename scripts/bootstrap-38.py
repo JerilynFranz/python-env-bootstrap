@@ -2,13 +2,13 @@
 development environment.
 
 This is a specialized version of the bootstrap script for projects that
-require Python 3.10 or later. It may use features that were deprecated
+require Python 3.8 or later. It may use features that were deprecated
 in later versions of Python, so it is kept separate to ensure compatibility.
 
-It is NOT intended to be run with Python versions earlier than 3.10 
+It is NOT intended to be run with Python versions earlier than 3.8
 and will exit with an error if attempted.
 
-It has been tested with Python 3.10 through 3.14 as of December 2025.
+It has been tested with Python 3.8 through 3.14 as of December 2025.
 
 This script is part of the 'python-env-bootstrap' project available at
 https://github.com/JerilynFranz/python-env-bootstrap
@@ -99,9 +99,9 @@ import sys
 #
 # The minimum version of Python this bootstrap script can support is 3.10+
 # This can be changed as needed for your project.
-if sys.version_info < (3, 10):
+if sys.version_info < (3, 8):
     major, minor = sys.version_info.major, sys.version_info.minor
-    print("Error: Python 3.10 or later is required to run this project. "
+    print("Error: Python 3.8 or later is required to run this project. "
           f"You are using Python {major}.{minor}.")
     sys.exit(2)
 
@@ -110,9 +110,9 @@ import os
 import shutil
 import stat
 import subprocess
-from functools import cache
+from functools import lru_cache as cache
 from pathlib import Path
-from typing import NamedTuple
+from typing import List, NamedTuple, Optional, Union
 from venv import create as create_venv
 
 DEFAULT_DEBUG: bool = False
@@ -152,7 +152,7 @@ class InstallSpec(NamedTuple):
 
 # --- Modules to install during bootstrap ---
 
-BOOTSTRAP_MODULES: list[InstallSpec] = [
+BOOTSTRAP_MODULES: List[InstallSpec] = [
     InstallSpec(name="uv", version=">=0.9.18"),
     InstallSpec(name="tox", version=">=4.22.0"),
     InstallSpec(name="tox-uv", version=">=1.13.1"),
@@ -161,6 +161,16 @@ BOOTSTRAP_MODULES: list[InstallSpec] = [
 # --- Tool usage instructions template ---
 
 TOOL_USAGE_INSTRUCTIONS = """
+
+You can now use the installed development tools within the activated virtual environment.
+
+"""
+
+# Example of tool usage instructions for tox and uv
+# (not actually run by the script, just included as an example
+# of how to use the 'TOOL_USAGE_INSTRUCTIONS' template)
+
+_TOX_AND_UV_INSTRUCTIONS_EXAMPLE = """
 You use 'tox' to run tasks that set up and manage the development environment,
 run tests, linters, and build documentation:
 
@@ -285,10 +295,10 @@ def _validate_string(value: str, name: str) -> None:
     if not isinstance(value, str):
         raise TypeError(f"{name} must be a string")
 
-def _validate_string_list(lst: list[str], name: str) -> None:
+def _validate_string_list(lst: List[str], name: str) -> None:
     """Validates that the input is a list of strings.
 
-    :param lst list[str]: The list to validate.
+    :param lst List[str]: The list to validate.
     :param name str: The name of the list (for error messages).
     :raises TypeError: If validation fails.
     """
@@ -297,7 +307,7 @@ def _validate_string_list(lst: list[str], name: str) -> None:
     if not all(isinstance(item, str) for item in lst):
         raise TypeError(f"all items in {name} must be strings")
 
-def _validate_module_list(modules: list[InstallSpec], name: str) -> None:
+def _validate_module_list(modules: List[InstallSpec], name: str) -> None:
     """Validates that the input is a list of InstallSpec instances.
 
     :param modules list[InstallSpec]: The list to validate.
@@ -310,13 +320,13 @@ def _validate_module_list(modules: list[InstallSpec], name: str) -> None:
         if not isinstance(module, InstallSpec):
             raise TypeError(f"all items in {name} must be InstallSpec instances")
 
-def _validate_command(lst: list[str | Path], name: str) -> None:
+def _validate_command(lst: List[Union[str, Path]], name: str) -> None:
     """Validates that the input is a list of that starts with
     either a string or Path, and contains only strings for all other items.
 
     It must contain at least one item.
 
-    :param lst list[str | Path]: The list to validate.
+    :param lst List[str | Path]: The list to validate.
     :param name str: The name of the list (for error messages).
     :raises TypeError: If validation fails.
     """
@@ -368,9 +378,9 @@ def _validate_path(path: Path, name: str, exists: bool = False) -> None:
     if exists and not path.exists():
         raise FileNotFoundError(f"{name} does not exist: {path}")
 
-def run_command(command: list[str | Path], *,
+def run_command(command: List[Union[str, Path]], *,
                 check: bool = True,
-                cwd: str | Path | None = None,
+                cwd: Optional[Union[str, Path]] = None,
                 **kwargs):
     """Helper to run a command and print its output.
 
@@ -561,7 +571,7 @@ def _remove_readonly(func, path, _):
     os.chmod(path, stat.S_IWRITE)
     func(path)
 
-def install_tools(python_exe: Path, modules: list[InstallSpec]) -> None:
+def install_tools(python_exe: Path, modules: List[InstallSpec]) -> None:
     """Installs core development tools into the virtual environment.
 
     If 'uv' is specified in the modules, it is bootstrapped with pip
@@ -584,7 +594,7 @@ def install_tools(python_exe: Path, modules: list[InstallSpec]) -> None:
     else:
         install_with_pip(python_exe, modules)
 
-def install_with_uv(python_exe: Path, modules: list[InstallSpec]) -> None:
+def install_with_uv(python_exe: Path, modules: List[InstallSpec]) -> None:
     """Installs 'uv' using pip, then uses 'uv' to install the specified modules.
 
     :param python_exe Path: The path to the Python executable within the venv.
@@ -594,7 +604,7 @@ def install_with_uv(python_exe: Path, modules: list[InstallSpec]) -> None:
     _validate_module_list(modules, "modules")
 
     uv_module: InstallSpec = [mod for mod in modules if mod.name == "uv"][0]
-    other_modules: list[InstallSpec] = [mod for mod in modules if mod.name != "uv"]
+    other_modules: List[InstallSpec] = [mod for mod in modules if mod.name != "uv"]
 
     bootstrap_message = (
         f"--> Bootstrapping 'uv' using 'pip': {uv_module}, "
@@ -610,7 +620,7 @@ def install_with_uv(python_exe: Path, modules: list[InstallSpec]) -> None:
     )
     run_command(command)
 
-def install_with_pip(python_exe: Path, modules: list[InstallSpec], message: str = '') -> None:
+def install_with_pip(python_exe: Path, modules: List[InstallSpec], message: str = '') -> None:
     """Installs the specified modules using 'pip'.
 
     :param python_exe Path: The path to the Python executable within the venv.
@@ -628,8 +638,8 @@ def install_with_pip(python_exe: Path, modules: list[InstallSpec], message: str 
     command = _build_install_command([python_exe, "-m", "pip", "--require-virtualenv"], modules)
     run_command(command)
 
-def _build_install_command(base_command: list[str | Path],
-                           modules: list[InstallSpec]) -> list[str | Path]:
+def _build_install_command(base_command: List[Union[str, Path]],
+                           modules: List[InstallSpec]) -> List[Union[str, Path]]:
     """Builds a complete installation command list for either 'pip' or 'uv pip'.
 
     :param base_command list[str | Path]: The base command to start with (e.g., pip or uv pip).

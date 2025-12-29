@@ -161,6 +161,16 @@ BOOTSTRAP_MODULES: list[InstallSpec] = [
 # --- Tool usage instructions template ---
 
 TOOL_USAGE_INSTRUCTIONS = """
+
+You can now use the installed development tools within the activated virtual environment.
+
+"""
+
+# Example of tool usage instructions for tox and uv
+# (not actually run by the script, just included as an example
+# of how to use the 'TOOL_USAGE_INSTRUCTIONS' template)
+
+_TOX_AND_UV_INSTRUCTIONS_EXAMPLE = """
 You use 'tox' to run tasks that set up and manage the development environment,
 run tests, linters, and build documentation:
 

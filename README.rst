@@ -28,11 +28,16 @@ common issues such as platform, Python version, and pip version differences.
 Customization and Usage
 -----------------------
 
-You use it by copying the `bootstrap.py <bootstrap.py>`_ standalone script
+You use it by copying the standalone bootstrap script
 into your own project's repository and updating the `POST_INSTALL_MESSAGE` string,
 the `TOOL_USAGE_INSTRUCTIONS` string, and the `BOOTSTRAP_MODULES` list
 of `InstallSpec` instances to match your project's PyPI modules environment
 requirements.
+
+There are currently two versions of the script provided:
+
+- `bootstrap-310.py <scripts/bootstrap-310.py>`_ : For projects that require Python 3.10 or later.
+- `bootstrap-38.py <scripts/bootstrap-38.py>`_ : For projects that require Python 3.8 or later.
 
 It has no external dependencies except that it requires at least Python 3.8.
 
