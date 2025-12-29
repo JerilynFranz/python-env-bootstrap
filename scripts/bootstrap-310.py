@@ -90,8 +90,9 @@ CLI Help
   -v, --verbose  Enable verbose output (default).
 
 """
-# pylint: disable=wrong-import-position
 import sys
+# pylint: disable=wrong-import-position
+from operator import ne
 
 # Check for minimum supported Python version before importing anything else
 # this ensures that users get a clear error message if they try to run
@@ -249,6 +250,52 @@ Continue? [y/n] """
 # DEFAULT_QUIET instead to change the default behavior.
 DEBUG: bool = False
 QUIET: bool = False
+
+
+# --- Version Control System (VCS) Hook Names ---
+
+# Standard Git and Mercurial hook names. If you need custom hooks,
+# you can modify these sets as needed. Only names included in these
+# sets will be installed by the install_vcs_hooks() function.
+GIT_HOOK_NAMES = {
+    "applypatch-msg", "commit-msg", "fsmonitor-watchman", "post-update",
+    "pre-applypatch", "pre-commit", "pre-merge-commit", "pre-push",
+    "pre-rebase", "pre-receive", "prepare-commit-msg", "update"
+}
+
+HG_HOOK_NAMES = {
+    "precommit", "commit", "prepush", "push", "preupdate", "update",
+    "prechangegroup", "changegroup", "pretag", "tag"
+}
+
+class VCS(NamedTuple):
+    """Specification for version control systems.
+
+    :param str name: The name of the VCS (e.g., 'git', 'hg', 'none').
+    """
+    name: str
+    repo_root: Path | None = None
+
+    def is_git(self) -> bool:
+        """Returns True if the VCS is git."""
+        return self.name == "git"
+    
+    def is_hg(self) -> bool:
+        """Returns True if the VCS is Mercurial."""
+        return self.name == "hg"
+    
+    def is_none(self) -> bool:
+        """Returns True if no VCS is detected."""
+        return self.name == "none"
+
+    def __str__(self) -> str:
+        return self.name
+
+DETECTED_VCS: VCS = VCS(name="none", repo_root='')
+
+"""Cache for the detected version control system."""
+
+"""The detected version control system in use (git, hg, or none)."""
 
 def run_post_install_steps(python_exe: Path, root_path: Path, bin_dir: Path) -> None:
     """Runs any post-installation steps required after installing tools.
@@ -452,12 +499,15 @@ def get_repo_root() -> Path:
     If a .git directory is not found, it looks for a Mercurial repository
     by searching for a '.hg' folder instead.
     """
+    global DETECTED_VCS  # pylint: disable=global-statement
     try:
         git_root_bytes = subprocess.check_output(
             ['git', 'rev-parse', '--show-toplevel'],
             stderr=subprocess.PIPE
         )
-        return Path(git_root_bytes.decode('utf-8').strip())
+        root_dir = git_root_bytes.decode('utf-8').strip()
+        DETECTED_VCS = VCS(name="git", repo_root=Path(root_dir))
+        return Path(root_dir)
     except (FileNotFoundError, subprocess.CalledProcessError):
         # Try Mercurial CLI
         try:
@@ -465,22 +515,261 @@ def get_repo_root() -> Path:
                 ['hg', 'root'],
                 stderr=subprocess.PIPE
             )
-            return Path(hg_root_bytes.decode('utf-8').strip())
+            root_dir = hg_root_bytes.decode('utf-8').strip()
+            DETECTED_VCS = VCS(name="hg", repo_root=Path(root_dir))
+            return Path(root_dir)
         except (FileNotFoundError, subprocess.CalledProcessError):
             # Fallback to directory search...
             current_dir = Path.cwd()
             for parent in [current_dir] + list(current_dir.parents):
                 if (parent / ".git").is_dir():
+                    DETECTED_VCS = VCS(name="git", repo_root=parent)
                     return parent
 
             # Check for Mercurial repository instead
             for parent in [current_dir] + list(current_dir.parents):
                 if (parent / ".hg").is_dir():
+                    DETECTED_VCS = VCS(name="hg", repo_root=parent)
                     return parent
 
             controlled_print("Error: No Git or Mercurial repository found in any parent directories.")
             raise FatalBootstrapError("No repository found.", error_code=1)
 
+def install_vcs_hooks(repo_root: Path, forced: bool) -> None:
+    """Install pre-commit and pre-push hooks for git or hg if present.
+    
+    It uses the 'hooks/' directory in the repository root
+    to find the hook scripts to install to the auto-detected VCS
+    metadata directory.
+
+    :param repo_root Path: The root directory of the repository.
+    :param forced bool: Whether to force overwrite of existing hooks.
+    """
+    _validate_path(repo_root, "repo_root", exists=True)
+
+    if DETECTED_VCS.is_none():
+        controlled_print("No version control system detected; skipping VCS hook installation.")
+        return
+
+    hooks_dir = repo_root / "hooks"
+    if not hooks_dir.exists():
+        controlled_print("No hooks/ directory found; skipping VCS hook installation.")
+        return
+
+    if DETECTED_VCS.is_git():
+        _install_git_hooks(repo_root, forced)
+    elif DETECTED_VCS.is_hg():
+        _install_hg_hooks(repo_root, forced)
+    else:
+        controlled_print("Unsupported VCS for hook installation; skipping.")
+
+
+def _is_valid_git_hook_name(name: str) -> bool:
+    """Checks if the given name is a valid Git hook name.
+    
+    :param name str: The hook name to check.
+    :return bool: True if valid, False otherwise.
+    """
+    return name in GIT_HOOK_NAMES
+
+def _is_valid_hg_hook_name(name: str) -> bool:
+    """Checks if the given name is a valid Mercurial hook name.
+
+    :param name str: The hook name to check.
+    :return bool: True if valid, False otherwise.
+    """
+    return name in HG_HOOK_NAMES
+
+def _install_git_hooks(repo_root: Path, forced: bool) -> None:
+    """Installs git hooks from the 'hooks/' directory in the repository root.
+    
+    :param repo_root Path: The root directory of the repository.
+    :param forced bool: Whether to force overwrite existing hooks.
+    """
+    _validate_path(repo_root, "repo_root", exists=True)
+
+    git_dir = repo_root / ".git"
+    hooks_dir = git_dir / "hooks"
+    source_hooks_dir = repo_root / "hooks"
+
+    if not source_hooks_dir.exists():
+        controlled_print("No hooks/ directory found; skipping Git hook installation.")
+        return
+
+    try:
+        for hook_file in source_hooks_dir.iterdir():
+            if hook_file.is_file():
+                hook_name = hook_file.name
+                if not _is_valid_git_hook_name(hook_name):
+                    controlled_print(f"Skipping non-standard Git hook: {hook_name}")
+                    continue
+                dest_hook = hooks_dir / hook_file.name
+                if dest_hook.exists():
+                    if forced:
+                        controlled_print(f"Overwriting existing git hook: {dest_hook}")
+                    else:
+                        controlled_print(f"Git hook already exists, skipping: {dest_hook}")
+                        continue
+                try:
+                    shutil.copy2(hook_file, dest_hook)
+                except Exception as e:
+                    controlled_print(f"Error: Could not copy hook {hook_file} to {dest_hook}: {e}")
+                    controlled_print("Skipping this hook.")
+                    continue
+                try:
+                    dest_hook.chmod(dest_hook.stat().st_mode | stat.S_IEXEC)
+                except Exception:
+                    controlled_print(f"Warning: Could not set executable permission for {dest_hook}")
+                controlled_print(f"Installed git hook: {dest_hook}")
+    except Exception as e:
+        controlled_print(f"Error while installing Git hooks: {e}")
+        controlled_print("Skipping Git hooks installation. Some hooks may not be installed.")
+
+def _install_hg_hooks(repo_root: Path, forced: bool) -> None:
+    """Installs Mercurial hooks from the 'hooks/' directory in the repository root.
+    
+    :param repo_root Path: The root directory of the repository.
+    :param forced bool: Whether to force overwrite existing hooks.
+    """
+    _validate_path(repo_root, "repo_root", exists=True)
+
+    hg_dir = repo_root / ".hg"
+    hgrc_file = hg_dir / "hgrc"
+    source_hooks_dir = repo_root / "hooks"
+    relative_hooks_path = "../hooks"
+
+    if not source_hooks_dir.exists():
+        controlled_print("No hooks/ directory found; skipping Mercurial hook installation.")
+        return
+
+    try:
+        if not hgrc_file.exists():
+            controlled_print(f"No hgrc file found at {hgrc_file}; creating a new one.")
+            hgrc_file.touch()
+    except Exception as e:
+        controlled_print(f"Error: Could not create hgrc file at {hgrc_file}: {e}")
+        controlled_print("Skipping Mercurial hooks installation.")
+        return
+
+    try:
+        installed_hooks: set[str] = _already_installed_hg_hooks(repo_root)
+        hook_entries = []
+        hook_names = set()
+        for hook_file in source_hooks_dir.iterdir():
+            if hook_file.is_file():
+                hook_name = hook_file.name
+                if not _is_valid_hg_hook_name(hook_name):
+                    controlled_print(f"Skipping non-standard Mercurial hook: {hook_name}")
+                    continue
+                if hook_name in installed_hooks and not forced:
+                    controlled_print(f"Mercurial hook already configured, skipping: {hook_name}")
+                    continue
+                hook_entries.append(f"{hook_name} = {relative_hooks_path}/{hook_name}\n")
+                hook_names.add(hook_name)
+    except Exception as e:
+        controlled_print(f"Error while preparing Mercurial hooks: {e}")
+        controlled_print("Skipping Mercurial hooks installation.")
+        return
+
+    if not hook_entries:
+        controlled_print("No Mercurial hooks to install; skipping.")
+        return
+
+    try:
+        uniquifier = 1
+        new_hgrc_file = hgrc_file.with_name(hgrc_file.name + f"new_{uniquifier}") 
+        while new_hgrc_file.exists():
+            uniquifier += 1
+            new_hgrc_file = hgrc_file.with_name(hgrc_file.name + f"new_{uniquifier}")
+
+        if hook_entries:
+            hgrc_content: list[str] = hgrc_file.read_text().splitlines(keepends=True)
+            found_hooks_section = False
+            with new_hgrc_file.open("w") as hgrc:
+                in_hooks_section = False
+                for line in hgrc_content:
+                    # Find [hooks] section
+                    stripped_line = line.strip()
+                    if stripped_line.startswith("[hooks]"):
+                        in_hooks_section = True
+                        found_hooks_section = True
+                        hgrc.write(line)
+                        continue
+                    
+                    # Process lines in [hooks] section
+                    if in_hooks_section:
+                        # end of [hooks] section
+                        if stripped_line.startswith("[") and stripped_line.endswith("]"):
+                            in_hooks_section = False
+                            # Add any remaining hooks before leaving section
+                            for name in hook_names:
+                                hgrc.write(f"{name} = {relative_hooks_path}/{name}\n")
+
+                        # A hook entry
+                        elif '=' in line:
+                            hook_name, hook_file = line.split('=', 1)
+                            hook_name = hook_name.strip()
+                            if hook_name in hook_names:
+                                hook_names.remove(hook_name)
+                                if forced:
+                                    controlled_print(f"Overwriting existing Mercurial hook: {hook_name}")
+                                    line = f"{hook_name} = {relative_hooks_path}/{hook_name}\n"
+                                else:
+                                    controlled_print(f"Mercurial hook already configured, skipping: {hook_name}")
+                    hgrc.write(line)
+
+                # If no [hooks] section was found, add it at the end
+                if not found_hooks_section:
+                    hgrc.write("[hooks]\n")
+                    hgrc.writelines(hook_entries)
+
+            # Replace original hgrc with new one (backup original)
+            backup_suffix = '.bak.'
+            backup_uniquifier = 1
+            backup_file = hgrc_file.with_name(hgrc_file.name + f"{backup_suffix}{backup_uniquifier}")
+            while backup_file.exists():
+                backup_uniquifier += 1
+                backup_file = hgrc_file.with_name(hgrc_file.name + f"{backup_suffix}{backup_uniquifier}")
+            shutil.copy2(hgrc_file, backup_file)
+            shutil.move(new_hgrc_file, hgrc_file)
+
+    except Exception as e:
+        controlled_print(f"Error while installing Mercurial hooks: {e}")
+        controlled_print("Skipping Mercurial hooks installation.")
+        return
+    
+    controlled_print(f"Configured Mercurial hooks in {hgrc_file}")
+
+def _already_installed_hg_hooks(repo_root: Path) -> set[str]:
+    """Returns a set of already installed Mercurial hook names from hgrc.
+
+    :param repo_root Path: The root directory of the repository.
+    :return set[str]: A set of installed hook names.
+    """
+    _validate_path(repo_root, "repo_root", exists=True)
+
+    hg_dir = repo_root / ".hg"
+    hgrc_file = hg_dir / "hgrc"
+    installed_hooks = set()
+
+    if not hgrc_file.exists():
+        return installed_hooks
+
+    with hgrc_file.open("r") as hgrc:
+        in_hooks_section = False
+        for line in hgrc:
+            line = line.strip()
+            if line.startswith("[hooks]"):
+                in_hooks_section = True
+                continue
+            if in_hooks_section:
+                if line.startswith("[") and line.endswith("]"):
+                    break  # End of hooks section
+                if '=' in line:
+                    hook_name = line.split('=')[0].strip()
+                    installed_hooks.add(hook_name)
+    
+    return installed_hooks
 
 def path_to_venv_python(venv_dir: Path) -> Path:
     """Returns the path to the Python executable within the virtual environment.
@@ -494,7 +783,6 @@ def path_to_venv_python(venv_dir: Path) -> Path:
     bin_dir = venv_dir / ("Scripts" if is_windows else "bin")
     python_exe = bin_dir / ("python.exe" if is_windows else "python")
     return python_exe
-
 
 @cache
 def pip_module_is_available(python_exe: Path) -> bool:
@@ -520,7 +808,6 @@ def pip_module_is_available(python_exe: Path) -> bool:
         return True
     except (FileNotFoundError, subprocess.CalledProcessError):
         return False
-
 
 def create_temporary_virtual_environment(venv_dir: Path, python_exe: Path) -> None:
     """
@@ -564,7 +851,6 @@ def remove_temporary_virtual_environment(venv_dir: Path, quiet: bool = False) ->
             shutil.rmtree(venv_dir, onexc=_remove_readonly)
         else:  # error handler deprecated in 3.12+
             shutil.rmtree(venv_dir, onerror=_remove_readonly)
-
 
 def _remove_readonly(func, path, _):
     "Clear the readonly bit and reattempt the removal"
@@ -704,16 +990,23 @@ def parse_arguments() -> argparse.Namespace:
     # Mutually exclusive group for verbosity
     verbosity_group = arg_parser.add_mutually_exclusive_group()
     verbosity_group.add_argument(
-        '-q', '--quiet',
+        '-q', '--quiet', '--ci',
         dest='quiet',
         action='store_true',
-        help="Suppress non-error output."
+        help="Suppress non-error output. This is useful for CI environments."
     )
     verbosity_group.add_argument(
         '-v', '--verbose',
         dest='quiet',
         action='store_false',
         help="Enable verbose output (default)."
+    )
+
+    # Forced hook installation option
+    arg_parser.add_argument(
+        '--force-hooks',
+        action='store_true',
+        help="Force overwrite of existing VCS hooks during installation."
     )
     arg_parser.set_defaults(quiet=DEFAULT_QUIET, debug=DEFAULT_DEBUG)
 
@@ -743,6 +1036,7 @@ def main():
         python_exe = path_to_venv_python(venv_dir)
         create_temporary_virtual_environment(venv_dir, python_exe)
         install_tools(python_exe, BOOTSTRAP_MODULES)
+        install_vcs_hooks(repo_root, forced=args.force_hooks)
 
         bin_dir = venv_dir / ("Scripts" if _is_windows() else "bin")
         run_post_install_steps(python_exe=python_exe, root_path=repo_root, bin_dir=bin_dir)
