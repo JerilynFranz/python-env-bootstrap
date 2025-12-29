@@ -39,7 +39,8 @@ There are currently two versions of the script provided:
 - `bootstrap-310.py <scripts/bootstrap-310.py>`_ : For projects that require Python 3.10 or later.
 - `bootstrap-38.py <scripts/bootstrap-38.py>`_ : For projects that require Python 3.8 or later.
 
-It has no external dependencies except that it requires at least Python 3.8.
+It has no external dependencies except that it requires at least the specified version of Python
+and network access to PyPI.
 
 To setup an environment you just run
 
