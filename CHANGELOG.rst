@@ -2,11 +2,13 @@
 Changelog
 =========
 
-1.1.1-beta - Fixed defaults around removal of bootstrap virtual environment (2025-12-29)
+1.2.0-beta - Fixed defaults around removal of bootstrap virtual environment (2025-12-29)
 ========================================================================================
 - Changed default value of `REMOVE_BOOTSTRAP_VENV_ON_EXIT` to `False`
   in `bootstrap-310.py` script to prevent accidental deletion of the created
   virtual environment after bootstrapping.
+- Added support for installing git and hg hooks in the bootstrapped environment
+  to facilitate better version control integration.
 
 1.1.0-beta - Added scripts directorty with version specific bootstrap scripts (2025-12-29)
 ==========================================================================================
