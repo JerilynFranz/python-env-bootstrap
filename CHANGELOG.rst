@@ -2,13 +2,13 @@
 Changelog
 =========
 
-1.1.1-beta - Fixed defaults around removal of bootstrap virtual environment (2025-12-27)
+1.1.1-beta - Fixed defaults around removal of bootstrap virtual environment (2025-12-29)
 ========================================================================================
 - Changed default value of `REMOVE_BOOTSTRAP_VENV_ON_EXIT` to `False`
   in `bootstrap-310.py` script to prevent accidental deletion of the created
   virtual environment after bootstrapping.
 
-1.1.0-beta - Added scripts directorty with version specific bootstrap scripts (2025-12-27)
+1.1.0-beta - Added scripts directorty with version specific bootstrap scripts (2025-12-29)
 ==========================================================================================
 
 - Introduced `scripts/bootstrap-310.py` for projects requiring Python 3.10 or later.
