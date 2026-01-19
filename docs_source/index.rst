@@ -1,8 +1,8 @@
 python-env-bootstrap
 ====================
 
-python-env-bootstrap is a Python project template and bootstrap script to help
-you quickly bootstrap a Python development environment.
+python-env-bootstrap is a Python project onboarding bootstrap script to help
+you quickly bootstrap a Python development environment for an existing project.
 
 Contents
 --------
