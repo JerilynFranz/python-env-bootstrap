@@ -45,14 +45,14 @@ This example script installs the following tools by default:
 - uv (for managing Python packages and dependencies)
 - tox (for running tests, linters, and building documentation)
 - tox-uv (to integrate uv with tox)
- 
+
 That is the minimum set of tools required to start development for this example project.
 
 The minimum supported Python version, virtual environment directory name,
 and list of tools to install can be customized by modifying the
 corresponding constants in this script. The script can also be extended to
 perform additional setup steps as needed via the run_post_install_steps() function
-such as installing additional packages from requirements.txt files 
+such as installing additional packages from requirements.txt files
 or configuring settings.
 
 The choices of installing 'uv' and 'tox' for the bootstrap are just examples;
@@ -90,6 +90,7 @@ CLI Help
   -v, --verbose  Enable verbose output (default).
 
 """
+
 # pylint: disable=wrong-import-position
 import sys
 
@@ -101,8 +102,7 @@ import sys
 # This can be changed as needed for your project.
 if sys.version_info < (3, 8):
     major, minor = sys.version_info.major, sys.version_info.minor
-    print("Error: Python 3.8 or later is required to run this project. "
-          f"You are using Python {major}.{minor}.")
+    print(f'Error: Python 3.8 or later is required to run this project. You are using Python {major}.{minor}.')
     sys.exit(2)
 
 import argparse
@@ -110,6 +110,7 @@ import os
 import shutil
 import stat
 import subprocess
+from collections.abc import Callable
 from functools import lru_cache as cache
 from pathlib import Path
 from typing import List, NamedTuple, Optional, Union
@@ -129,11 +130,12 @@ To enable quiet output by default, set this to True
 and then --verbose can be used to disable it.
 """
 
-VENV_DIR: str = ".venvtools"
+VENV_DIR: str = '.venv'
 """The name of the virtual environment directory to create in the repository root for the bootstrap."""
 
-ACTIVATED_VENV_DIR: str = 'venv'
+ACTIVATED_VENV_DIR: str = '.venv'
 """The name of the virtual environment directory when the project virtual environment is activated."""
+
 
 class InstallSpec(NamedTuple):
     """Specification for modules required to be installed.
@@ -142,20 +144,21 @@ class InstallSpec(NamedTuple):
     :param str version: An optional version specifier (e.g., ">=1.0.0").
     :param str extras: An optional extras specifier (e.g., "[dev]").
     """
+
     name: str
     version: str = ''
     extras: str = ''
 
-    def __str__(self):
-        return f"{self.name}{self.extras}{self.version or ' (latest)'}"
+    def __str__(self) -> str:
+        return f'{self.name}{self.extras}{self.version or " (latest)"}'
 
 
 # --- Modules to install during bootstrap ---
 
 BOOTSTRAP_MODULES: List[InstallSpec] = [
-    InstallSpec(name="uv", version=">=0.9.18"),
-    InstallSpec(name="tox", version=">=4.22.0"),
-    InstallSpec(name="tox-uv", version=">=1.13.1"),
+    InstallSpec(name='uv', version='>=0.9.18'),
+    InstallSpec(name='tox', version='>=4.22.0'),
+    InstallSpec(name='tox-uv', version='>=1.13.1'),
 ]
 
 # --- Tool usage instructions template ---
@@ -233,7 +236,7 @@ CONFIRMATION_PROMPT_MESSAGE = f"""
 This script will create a {VENV_DIR} directory in the root
 of the current repository.
 
-It will install required tools into it for development, 
+It will install required tools into it for development,
 and install the project as an editable package into the
 virtual environment.
 
@@ -249,6 +252,7 @@ Continue? [y/n] """
 # DEFAULT_QUIET instead to change the default behavior.
 DEBUG: bool = False
 QUIET: bool = False
+
 
 def run_post_install_steps(python_exe: Path, root_path: Path, bin_dir: Path) -> None:
     """Runs any post-installation steps required after installing tools.
@@ -267,23 +271,27 @@ def run_post_install_steps(python_exe: Path, root_path: Path, bin_dir: Path) -> 
     :param python_exe Path: The path to the Python executable within the venv.
     :param root_path Path: The path to the root of the repository.
     """
-    _validate_path(python_exe, "python_exe", exists=True)
-    _validate_path(root_path, "root_path", exists=True)
-    controlled_print("--> Running initial 'tox devenv -e dev' to setup and activate the development environment...")
-    run_command([python_exe, str(bin_dir / "tox"), "devenv", "-e", "dev"], cwd=root_path, check=True)
-    controlled_print("--> Installing the current project in editable mode within the development environment...")
-    run_command([bin_dir / "uv", "pip", "install", "-e", "."], cwd=root_path, check=True)
+    _validate_path(python_exe, 'python_exe', exists=True)
+    _validate_path(root_path, 'root_path', exists=True)
+    # controlled_print("--> Running initial 'tox devenv -e dev' to setup and activate the development environment...")
+    # run_command([python_exe, str(bin_dir / 'tox'), 'devenv', '-e', 'dev'], cwd=root_path, check=True)
+    controlled_print('--> Installing the current project in editable mode within the development environment...')
+    run_command([bin_dir / 'uv', 'pip', 'install', '-e', '.'], cwd=root_path, check=True)
+    run_command([bin_dir / 'uv', 'sync'], cwd=root_path, check=True)
 
 
 class FatalBootstrapError(Exception):
     """Exception raised for fatal errors during the bootstrap process."""
-    def __init__(self, message: str, error_code: int = 1):
+
+    def __init__(self, message: str, error_code: int = 1) -> None:
         super().__init__(message)
         self.error_code = error_code
 
+
 def _is_windows() -> bool:
     """Determines if the current platform is Windows."""
-    return sys.platform == "win32"
+    return sys.platform == 'win32'
+
 
 def _validate_string(value: str, name: str) -> None:
     """Validates that the input is a string.
@@ -293,7 +301,8 @@ def _validate_string(value: str, name: str) -> None:
     :raises TypeError: If validation fails.
     """
     if not isinstance(value, str):
-        raise TypeError(f"{name} must be a string")
+        raise TypeError(f'{name} must be a string')
+
 
 def _validate_string_list(lst: List[str], name: str) -> None:
     """Validates that the input is a list of strings.
@@ -303,9 +312,10 @@ def _validate_string_list(lst: List[str], name: str) -> None:
     :raises TypeError: If validation fails.
     """
     if not isinstance(lst, list):
-        raise TypeError(f"{name} must be a list")
+        raise TypeError(f'{name} must be a list')
     if not all(isinstance(item, str) for item in lst):
-        raise TypeError(f"all items in {name} must be strings")
+        raise TypeError(f'all items in {name} must be strings')
+
 
 def _validate_module_list(modules: List[InstallSpec], name: str) -> None:
     """Validates that the input is a list of InstallSpec instances.
@@ -315,10 +325,11 @@ def _validate_module_list(modules: List[InstallSpec], name: str) -> None:
     :raises TypeError: If validation fails.
     """
     if not isinstance(modules, list):
-        raise TypeError(f"{name} must be a list")
+        raise TypeError(f'{name} must be a list')
     for module in modules:
         if not isinstance(module, InstallSpec):
-            raise TypeError(f"all items in {name} must be InstallSpec instances")
+            raise TypeError(f'all items in {name} must be InstallSpec instances')
+
 
 def _validate_command(lst: List[Union[str, Path]], name: str) -> None:
     """Validates that the input is a list of that starts with
@@ -331,13 +342,14 @@ def _validate_command(lst: List[Union[str, Path]], name: str) -> None:
     :raises TypeError: If validation fails.
     """
     if not isinstance(lst, list):
-        raise TypeError(f"{name} must be a list")
+        raise TypeError(f'{name} must be a list')
     if not lst:
-        raise ValueError(f"{name} must not be empty")
+        raise ValueError(f'{name} must not be empty')
     if not isinstance(lst[0], (str, Path)):
-        raise TypeError(f"the first item in {name} must be a string or Path")
+        raise TypeError(f'the first item in {name} must be a string or Path')
     if not all(isinstance(item, str) for item in lst[1:]):
-        raise TypeError(f"all items after the first in {name} must be strings")
+        raise TypeError(f'all items after the first in {name} must be strings')
+
 
 def _validate_boolean(value: bool, name: str) -> None:
     """Validates that the input is a boolean.
@@ -347,7 +359,8 @@ def _validate_boolean(value: bool, name: str) -> None:
     :raises TypeError: If validation fails.
     """
     if not isinstance(value, bool):
-        raise TypeError(f"{name} must be a boolean")
+        raise TypeError(f'{name} must be a boolean')
+
 
 def _validate_kwarg_keys_are_strings(kwargs: dict, name: str) -> None:
     """Validates that all keys in the input dictionary are strings.
@@ -357,9 +370,9 @@ def _validate_kwarg_keys_are_strings(kwargs: dict, name: str) -> None:
     :raises TypeError: If validation fails.
     """
     if not isinstance(kwargs, dict):
-        raise TypeError(f"{name} must be a dictionary")
+        raise TypeError(f'{name} must be a dictionary')
     if not all(isinstance(k, str) for k in kwargs.keys()):
-        raise TypeError(f"all keys in {name} must be strings")
+        raise TypeError(f'all keys in {name} must be strings')
 
 
 def _validate_path(path: Path, name: str, exists: bool = False) -> None:
@@ -374,14 +387,18 @@ def _validate_path(path: Path, name: str, exists: bool = False) -> None:
     :raises FileNotFoundError: If exists is True and the path does not exist.
     """
     if not isinstance(path, Path):
-        raise TypeError(f"{name} must be a Path instance")
+        raise TypeError(f'{name} must be a Path instance')
     if exists and not path.exists():
-        raise FileNotFoundError(f"{name} does not exist: {path}")
+        raise FileNotFoundError(f'{name} does not exist: {path}')
 
-def run_command(command: List[Union[str, Path]], *,
-                check: bool = True,
-                cwd: Optional[Union[str, Path]] = None,
-                **kwargs):
+
+def run_command(
+    command: List[Union[str, Path]],
+    *,
+    check: bool = True,
+    cwd: Optional[Union[str, Path]] = None,
+    **kwargs,  # noqa: ANN003
+) -> None:
     """Helper to run a command and print its output.
 
     If the command is not found, or returns a non-zero exit code,
@@ -392,43 +409,46 @@ def run_command(command: List[Union[str, Path]], *,
     :param cwd str | Path | None: The working directory for the command.
     :param kwargs: Additional keyword arguments to pass to subprocess.run().
     """
-    _validate_command(command, "command")
-    _validate_boolean(check, "check")
+    _validate_command(command, 'command')
+    _validate_boolean(check, 'check')
     if cwd:
-        _validate_path(Path(cwd), "cwd", exists=True)
-    _validate_kwarg_keys_are_strings(kwargs, "kwargs")
+        _validate_path(Path(cwd), 'cwd', exists=True)
+    _validate_kwarg_keys_are_strings(kwargs, 'kwargs')
 
     try:
         if DEBUG:
             debug_kwargs = kwargs.copy()
             if cwd:
                 debug_kwargs['cwd'] = cwd
-            print(f"DEBUG: Running {command} with kwargs: {debug_kwargs}")
+            print(f'DEBUG: Running {command} with kwargs: {debug_kwargs}')
         # Suppress output if QUIET is True and not already overridden
         if QUIET:
             kwargs.setdefault('stdout', subprocess.DEVNULL)
             kwargs.setdefault('stderr', subprocess.DEVNULL)
         subprocess.run(command, check=check, cwd=cwd, **kwargs)
-    except FileNotFoundError:
+    except FileNotFoundError as e:
         print(f"Error: Command '{command[0]}' not found. Is it in your PATH?")
-        raise FatalBootstrapError(f"Command '{command[0]}' not found.", error_code=1)
+        raise FatalBootstrapError(f"Command '{command[0]}' not found.", error_code=1) from e
     except subprocess.CalledProcessError as e:
-        print(f"Error: Command {command} failed with exit code {e.returncode}")
-        raise FatalBootstrapError(f"Command {command} failed with exit code {e.returncode}",
-                                  error_code=e.returncode)
+        print(f'Error: Command {command} failed with exit code {e.returncode}')
+        raise FatalBootstrapError(
+            f'Command {command} failed with exit code {e.returncode}', error_code=e.returncode
+        ) from e
+
 
 def controlled_print(message: str) -> None:
     """Prints a message if not in quiet mode."""
-    _validate_string(message, "message")
+    _validate_string(message, 'message')
     if not QUIET:
         print(message)
+
 
 def confirmation_prompt(message: str) -> bool:
     """Prompts the user for confirmation to proceed."""
     try:
         repo_root = get_repo_root()
-        controlled_print(f"Current working directory: {os.getcwd()}")
-        controlled_print(f"Repository root directory: {repo_root}")
+        controlled_print(f'Current working directory: {os.getcwd()}')
+        controlled_print(f'Repository root directory: {repo_root}')
         choice = ''
         while choice.lower().strip() not in ('y', 'yes', 'n', 'no'):
             choice = input(message)
@@ -453,33 +473,27 @@ def get_repo_root() -> Path:
     by searching for a '.hg' folder instead.
     """
     try:
-        git_root_bytes = subprocess.check_output(
-            ['git', 'rev-parse', '--show-toplevel'],
-            stderr=subprocess.PIPE
-        )
+        git_root_bytes = subprocess.check_output(['git', 'rev-parse', '--show-toplevel'], stderr=subprocess.PIPE)
         return Path(git_root_bytes.decode('utf-8').strip())
     except (FileNotFoundError, subprocess.CalledProcessError):
         # Try Mercurial CLI
         try:
-            hg_root_bytes = subprocess.check_output(
-                ['hg', 'root'],
-                stderr=subprocess.PIPE
-            )
+            hg_root_bytes = subprocess.check_output(['hg', 'root'], stderr=subprocess.PIPE)
             return Path(hg_root_bytes.decode('utf-8').strip())
         except (FileNotFoundError, subprocess.CalledProcessError):
             # Fallback to directory search...
             current_dir = Path.cwd()
             for parent in [current_dir] + list(current_dir.parents):
-                if (parent / ".git").is_dir():
+                if (parent / '.git').is_dir():
                     return parent
 
             # Check for Mercurial repository instead
             for parent in [current_dir] + list(current_dir.parents):
-                if (parent / ".hg").is_dir():
+                if (parent / '.hg').is_dir():
                     return parent
 
-            controlled_print("Error: No Git or Mercurial repository found in any parent directories.")
-            raise FatalBootstrapError("No repository found.", error_code=1)
+            controlled_print('Error: No Git or Mercurial repository found in any parent directories.')
+            raise FatalBootstrapError('No repository found.', error_code=1)  # noqa: B904
 
 
 def path_to_venv_python(venv_dir: Path) -> Path:
@@ -489,10 +503,10 @@ def path_to_venv_python(venv_dir: Path) -> Path:
     :param is_windows bool: Whether the platform is Windows.
     :return: The path to the Python executable.
     """
-    _validate_path(venv_dir, "venv_dir", exists=False)
+    _validate_path(venv_dir, 'venv_dir', exists=False)
     is_windows = _is_windows()
-    bin_dir = venv_dir / ("Scripts" if is_windows else "bin")
-    python_exe = bin_dir / ("python.exe" if is_windows else "python")
+    bin_dir = venv_dir / ('Scripts' if is_windows else 'bin')
+    python_exe = bin_dir / ('python.exe' if is_windows else 'python')
     return python_exe
 
 
@@ -503,20 +517,14 @@ def pip_module_is_available(python_exe: Path) -> bool:
     :param python_exe Path: The path to the Python executable.
     :return: True if 'pip' is available, False otherwise.
     """
-    _validate_path(python_exe, "python_exe", exists=True)
+    _validate_path(python_exe, 'python_exe', exists=True)
 
     stdout = subprocess.PIPE if not QUIET else subprocess.DEVNULL
     stderr = subprocess.PIPE if not QUIET else subprocess.DEVNULL
     try:
         if DEBUG:
-            controlled_print(f"DEBUG: Running '{python_exe} -m pip --version' to check "
-                  "for pip availability")
-        subprocess.run(
-            [python_exe, "-m", "pip", "--version"],
-            check=True,
-            stdout=stdout,
-            stderr=stderr
-        )
+            controlled_print(f"DEBUG: Running '{python_exe} -m pip --version' to check for pip availability")
+        subprocess.run([python_exe, '-m', 'pip', '--version'], check=True, stdout=stdout, stderr=stderr)
         return True
     except (FileNotFoundError, subprocess.CalledProcessError):
         return False
@@ -529,47 +537,48 @@ def create_temporary_virtual_environment(venv_dir: Path, python_exe: Path) -> No
     :param venv_dir Path: The directory to create the virtual environment in.
     :param python_exe Path: The path to the Python executable within the venv.
     """
-    _validate_path(venv_dir, "venv_dir", exists=False)
-    _validate_path(python_exe, "python_exe", exists=False)
+    _validate_path(venv_dir, 'venv_dir', exists=False)
+    _validate_path(python_exe, 'python_exe', exists=False)
 
     if not venv_dir.exists():
         controlled_print(f"Creating temporary virtual environment in '{venv_dir}'...")
         create_venv(venv_dir, with_pip=True)
-        controlled_print("---> Ensuring pip CLI script is installed in the virtual environment...")
-        run_command([python_exe, "-m", "ensurepip", "--upgrade"])
+        controlled_print('---> Ensuring pip CLI script is installed in the virtual environment...')
+        run_command([python_exe, '-m', 'ensurepip', '--upgrade'])
 
-        controlled_print("---> Upgrading pip in the virtual environment to latest version...")
+        controlled_print('---> Upgrading pip in the virtual environment to latest version...')
         if not pip_module_is_available(python_exe):
-            pip_path = venv_dir / "Scripts" / "pip.exe" if _is_windows() else venv_dir / "bin" / "pip"
+            pip_path = venv_dir / 'Scripts' / 'pip.exe' if _is_windows() else venv_dir / 'bin' / 'pip'
             if not pip_path.exists():
                 controlled_print("Error: 'pip' is not available in the virtual environment after ensurepip.")
-                controlled_print("Please check your Python installation.")
+                controlled_print('Please check your Python installation.')
                 raise FatalBootstrapError("'pip' not available in virtual environment.", error_code=1)
-            run_command([pip_path, "install", "--upgrade", "pip"])
+            run_command([pip_path, 'install', '--upgrade', 'pip'])
         else:
-            run_command([
-                python_exe, "-m", "pip", "install", "--upgrade", "pip", "--require-virtualenv"])
+            run_command([python_exe, '-m', 'pip', 'install', '--upgrade', 'pip', '--require-virtualenv'])
     else:
         controlled_print(f"Virtual environment '{venv_dir}' already exists. Skipping creation.")
 
+
 def remove_temporary_virtual_environment(venv_dir: Path, quiet: bool = False) -> None:
     """Removes the temporary virtual environment directory.
-    
+
     :param venv_dir Path: The directory of the virtual environment to remove.
     """
     if not quiet:
         controlled_print(f"Removing temporary virtual environment at '{venv_dir}'...")
     if venv_dir.exists():
         if sys.version_info >= (3, 12):
-            shutil.rmtree(venv_dir, onexc=_remove_readonly)
+            shutil.rmtree(venv_dir, onexc=_remove_readonly)  # type: ignore[arg-type]
         else:  # error handler deprecated in 3.12+
             shutil.rmtree(venv_dir, onerror=_remove_readonly)
 
 
-def _remove_readonly(func, path, _):
+def _remove_readonly(func: Callable[[Union[Path, str]], None], path: Union[str, Path], _: object) -> None:
     "Clear the readonly bit and reattempt the removal"
     os.chmod(path, stat.S_IWRITE)
     func(path)
+
 
 def install_tools(python_exe: Path, modules: List[InstallSpec]) -> None:
     """Installs core development tools into the virtual environment.
@@ -581,18 +590,19 @@ def install_tools(python_exe: Path, modules: List[InstallSpec]) -> None:
     :param python_exe Path: The path to the Python executable within the venv.
     :param modules list[InstallSpec]: A list of InstallSpec objects to install.
     """
-    _validate_path(python_exe, "python_exe", exists=True)
-    _validate_module_list(modules, "modules")
+    _validate_path(python_exe, 'python_exe', exists=True)
+    _validate_module_list(modules, 'modules')
 
     if not modules:
         return
 
-    controlled_print("Installing/updating core development tools...")
-    using_uv = any(mod.name == "uv" for mod in modules)
+    controlled_print('Installing/updating core development tools...')
+    using_uv = any(mod.name == 'uv' for mod in modules)
     if using_uv:
         install_with_uv(python_exe, modules)
     else:
         install_with_pip(python_exe, modules)
+
 
 def install_with_uv(python_exe: Path, modules: List[InstallSpec]) -> None:
     """Installs 'uv' using pip, then uses 'uv' to install the specified modules.
@@ -600,25 +610,22 @@ def install_with_uv(python_exe: Path, modules: List[InstallSpec]) -> None:
     :param python_exe Path: The path to the Python executable within the venv.
     :param modules list[InstallSpec]: A list of InstallSpec objects to install.
     """
-    _validate_path(python_exe, "python_exe", exists=True)
-    _validate_module_list(modules, "modules")
+    _validate_path(python_exe, 'python_exe', exists=True)
+    _validate_module_list(modules, 'modules')
 
-    uv_module: InstallSpec = [mod for mod in modules if mod.name == "uv"][0]
-    other_modules: List[InstallSpec] = [mod for mod in modules if mod.name != "uv"]
+    uv_module: InstallSpec = [mod for mod in modules if mod.name == 'uv'][0]
+    other_modules: List[InstallSpec] = [mod for mod in modules if mod.name != 'uv']
 
-    bootstrap_message = (
-        f"--> Bootstrapping 'uv' using 'pip': {uv_module}, "
-        f"{uv_module.version or 'latest'}")
+    bootstrap_message = f"--> Bootstrapping 'uv' using 'pip': {uv_module}, {uv_module.version or 'latest'}"
     install_with_pip(python_exe, [uv_module], message=bootstrap_message)
 
     if not other_modules:
         return
 
     controlled_print("--> Installing remaining modules using 'uv pip'")
-    command = _build_install_command(
-        [python_exe, "-m", "uv", "pip"], other_modules
-    )
+    command = _build_install_command([python_exe, '-m', 'uv', 'pip'], other_modules)
     run_command(command)
+
 
 def install_with_pip(python_exe: Path, modules: List[InstallSpec], message: str = '') -> None:
     """Installs the specified modules using 'pip'.
@@ -627,29 +634,29 @@ def install_with_pip(python_exe: Path, modules: List[InstallSpec], message: str 
     :param modules: A list of InstallSpec objects to install.
     :param message str: An optional message to print before installation.
     """
-    _validate_path(python_exe, "python_exe", exists=True)
-    _validate_module_list(modules, "modules")
-    _validate_string(message, "message")
+    _validate_path(python_exe, 'python_exe', exists=True)
+    _validate_module_list(modules, 'modules')
+    _validate_string(message, 'message')
 
     if message:
         controlled_print(message)
     else:
         controlled_print("--> Installing modules using 'pip'")
-    command = _build_install_command([python_exe, "-m", "pip", "--require-virtualenv"], modules)
+    command = _build_install_command([python_exe, '-m', 'pip', '--require-virtualenv'], modules)
     run_command(command)
 
-def _build_install_command(base_command: List[Union[str, Path]],
-                           modules: List[InstallSpec]) -> List[Union[str, Path]]:
+
+def _build_install_command(base_command: List[Union[str, Path]], modules: List[InstallSpec]) -> List[Union[str, Path]]:
     """Builds a complete installation command list for either 'pip' or 'uv pip'.
 
     :param base_command list[str | Path]: The base command to start with (e.g., pip or uv pip).
     :param modules list[InstallSpec]: A list of InstallSpec objects to install.
     :return list[str | Path]: The complete command list to run.
     """
-    _validate_command(base_command, "base_command")
-    _validate_module_list(modules, "modules")
+    _validate_command(base_command, 'base_command')
+    _validate_module_list(modules, 'modules')
 
-    command = base_command + ["install", "-U"]
+    command = base_command + ['install', '-U']
     for module in modules:
         spec_str = module.name
         if module.extras:
@@ -659,17 +666,18 @@ def _build_install_command(base_command: List[Union[str, Path]],
         command.append(spec_str)
     return command
 
+
 def print_instructions(template: str) -> None:
     """Prints instructions to the user on how to activate the virtual environment
     and use the installed tools.
 
     :param template str: The instructions template to use.
     """
-    _validate_string(template, "template")
+    _validate_string(template, 'template')
 
-    activate_script = f"source {ACTIVATED_VENV_DIR}/bin/activate"
+    activate_script = f'source {ACTIVATED_VENV_DIR}/bin/activate'
     if _is_windows():
-        activate_script = f"{ACTIVATED_VENV_DIR}\\Scripts\\activate.bat"
+        activate_script = f'{ACTIVATED_VENV_DIR}\\Scripts\\activate.bat'
 
     instructions = template.format(activate=activate_script)
     controlled_print(instructions)
@@ -678,48 +686,29 @@ def print_instructions(template: str) -> None:
 def parse_arguments() -> argparse.Namespace:
     """Parses command-line arguments."""
     arg_parser = argparse.ArgumentParser(
-        description="Bootstrap the development environment by creating a "
-                    "virtual environment and installing required tools."
+        description='Bootstrap the development environment by creating a '
+        'virtual environment and installing required tools.'
     )
     arg_parser.add_argument(
-        '--yes', '-y',
-        action='store_true',
-        help="Automatically confirm and proceed without prompting."
+        '--yes', '-y', action='store_true', help='Automatically confirm and proceed without prompting.'
     )
 
     debug_group = arg_parser.add_mutually_exclusive_group()
-    debug_group.add_argument(
-        '--debug',
-        dest='debug',
-        action='store_true',
-        help="Enable debug output."
-    )
-    debug_group.add_argument(
-        '--no-debug',
-        dest='debug',
-        action='store_false',
-        help="Disable debug output."
-    )
+    debug_group.add_argument('--debug', dest='debug', action='store_true', help='Enable debug output.')
+    debug_group.add_argument('--no-debug', dest='debug', action='store_false', help='Disable debug output.')
 
     # Mutually exclusive group for verbosity
     verbosity_group = arg_parser.add_mutually_exclusive_group()
+    verbosity_group.add_argument('-q', '--quiet', dest='quiet', action='store_true', help='Suppress non-error output.')
     verbosity_group.add_argument(
-        '-q', '--quiet',
-        dest='quiet',
-        action='store_true',
-        help="Suppress non-error output."
-    )
-    verbosity_group.add_argument(
-        '-v', '--verbose',
-        dest='quiet',
-        action='store_false',
-        help="Enable verbose output (default)."
+        '-v', '--verbose', dest='quiet', action='store_false', help='Enable verbose output (default).'
     )
     arg_parser.set_defaults(quiet=DEFAULT_QUIET, debug=DEFAULT_DEBUG)
 
     return arg_parser.parse_args()
 
-def main():
+
+def main() -> None:
     """
     Checks for required development tools and bootstraps a local virtual
     environment with them if necessary.
@@ -730,21 +719,21 @@ def main():
     QUIET = args.quiet
 
     if QUIET and not args.yes:
-        print("Note: You can use --yes/-y to skip confirmation prompts.")
+        print('Note: You can use --yes/-y to skip confirmation prompts.')
     if not args.yes and not confirmation_prompt(CONFIRMATION_PROMPT_MESSAGE):
-        print("Aborted by user.")
+        print('Aborted by user.')
         sys.exit(0)
     try:
         repo_root = get_repo_root()
 
-        controlled_print(f"--- Bootstrapping development environment (in {repo_root}) ---")
+        controlled_print(f'--- Bootstrapping development environment (in {repo_root}) ---')
 
         venv_dir = repo_root / VENV_DIR
         python_exe = path_to_venv_python(venv_dir)
         create_temporary_virtual_environment(venv_dir, python_exe)
         install_tools(python_exe, BOOTSTRAP_MODULES)
 
-        bin_dir = venv_dir / ("Scripts" if _is_windows() else "bin")
+        bin_dir = venv_dir / ('Scripts' if _is_windows() else 'bin')
         run_post_install_steps(python_exe=python_exe, root_path=repo_root, bin_dir=bin_dir)
         remove_temporary_virtual_environment(venv_dir)
         print_instructions(POST_INSTALL_MESSAGE)
@@ -752,18 +741,19 @@ def main():
     except KeyboardInterrupt:
         remove_temporary_virtual_environment(venv_dir, quiet=True)
         controlled_print('')
-        controlled_print("Aborted by user.")
+        controlled_print('Aborted by user.')
         sys.exit(2)
 
     except FatalBootstrapError as e:
         remove_temporary_virtual_environment(venv_dir, quiet=True)
-        controlled_print(f"Fatal error during bootstrap: {e}")
+        controlled_print(f'Fatal error during bootstrap: {e}')
         sys.exit(e.error_code)
 
     except Exception as e:
         remove_temporary_virtual_environment(venv_dir, quiet=True)
-        controlled_print(f"Fatal error during bootstrap: {e}")
+        controlled_print(f'Fatal error during bootstrap: {e}')
         sys.exit(1)
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     main()
