@@ -20,6 +20,20 @@ It automatically creates a virtual environment and installs
 all required PyPI modules into that virtual environment while handling
 common issues such as platform, Python version, and pip version differences.
 
+**New in recent versions:**
+
+- **VCS Hook Installation:**  
+  The script can automatically detect and install pre-commit hooks for both Git and
+  Mercurial repositories. This helps ensure that code quality checks or other
+  automated actions are run before each commit, improving consistency and reducing
+  manual setup for contributors. The hook scripts are expected to be located in a
+  `hooks/` directory at the root of the project, but this can be customized as needed.
+
+- **PowerShell Execution Policy Support:**  
+  On Windows, the script can detect if it is running in a PowerShell environment
+  and will attempt to set the execution policy as needed to allow activation scripts
+  to run. This reduces friction for Windows users and helps avoid common activation issues.
+
 .. note:: It **DOES NOT** setup a new project
 
    It is NOT for creating a new Python project - it is just for onboarding a developer
@@ -61,6 +75,13 @@ It has the following command-line options:
 - `--no-debug` : Disable debug output.
 - `-q, --quiet` : Suppress non-error output.
 - `-v, --verbose` : Enable verbose output (default).
+- `--force-hooks` : Force (re)installation of VCS hooks, even if they already exist.
+
+**VCS Hooks:**  
+If your project uses Git or Mercurial, the script will attempt to install pre-commit hooks automatically. You can customize the hook scripts or disable this feature as needed.
+
+**PowerShell Support:**  
+On Windows, the script will attempt to set the PowerShell execution policy to allow activation scripts to run, reducing setup issues for Windows users.
 
 That's it. That's everything.
 

@@ -1,6 +1,6 @@
 [project]
 name = "python-env-bootstrap"
-version = "1.3.0-rc1"
+version = "1.4.0"
 requires-python = ">=3.11"
 description = "Zero-dependency script for robustly bootstrapping a Python developer environment."
 authors = [
@@ -75,8 +75,9 @@ tools = [
 [tool.tox]
 requires = ["tox>=4.22"]
 env_list = [ 
-    "py31{0-4},py38,py39",
-    "lint",
+#    "py31{0-4},py38,py39",
+    "lint38",
+    "lint310",
 ]
 install_command = ["uv", "pip", "install", "{opts}", "{packages}"]
 
@@ -89,7 +90,7 @@ test = ["py310", "py311", "py312", "py313", "py314", "doctest", "lint"]
 [tool.tox.env_run_base]
 description = "Run test under {base_python}"
 allowlist_externals = ["pytest", "flake8", "pylint", "mypy"]
-dependency_groups = ["test", "lint", "tools", "types"]
+dependency_groups = ["test", "lint", "tools"]
 extras = ["all"]
 commands = [["pytest", "{posargs:tests/}"]]
 
@@ -109,14 +110,24 @@ allowlist_externals = ["pytest", "mypy", "flake8", "pylint"]
 
 commands = []
 
-[tool.tox.env.lint]
-description = "Run linters"
+[tool.tox.env.lint38]
+description = "Run linters for Python 3.8"
 package = "skip"
-base_python = ["python3.12"]
+base_python = ["python3.8"]
 dependency_groups = ["lint"]
 commands = [
-    ["ruff", "check", "scripts"],
-    ["mypy", "scripts"]
+    ["ruff", "check", "scripts/bootstrap-38.py"],
+    ["mypy", "scripts/bootstrap-38.py"]
+]
+
+[tool.tox.env.lint310]
+description = "Run linters for Python 3.10"
+package = "skip"
+base_python = ["python3.10"]
+dependency_groups = ["lint"]
+commands = [
+    ["ruff", "check", "scripts/bootstrap-310.py"],
+    ["mypy", "scripts/bootstrap-310.py"]
 ]
 
 [tool.tox.env.docs]

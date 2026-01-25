@@ -2,6 +2,21 @@
 Changelog
 =========
 
+1.4.0 - Added git/hg hooks installation support and PowerShell support (2026-02-10)
+===========================================================
+- Enhanced both `scripts/bootstrap-310.py` and `scripts/bootstrap-38.py` to include
+  an option for installing git and hg hooks in the bootstrapped environment.
+  This addition aims to improve version control integration for projects
+  using these bootstrap scripts.
+- Added support for PowerShell execution in both bootstrap scripts, allowing users
+  on Windows systems to run the scripts in PowerShell environments seamlessly.
+- Updated documentation in `README.rst` to reflect the new features and provide
+  guidance on using git/hg hooks and PowerShell support.
+- Fixed Python 3.8 compatibility issues in `scripts/bootstrap-38.py` to ensure
+  smooth operation across supported Python versions.
+- Added type checking tests for both bootstrap scripts to enhance code quality
+  and maintainability.
+
 1.3.0-rc1- Misc improvements and fixes (2026-01-18)
 ===================================================
 - Updated documentation in `README.rst` and `docs_source/index.rst` to clarify the purpose

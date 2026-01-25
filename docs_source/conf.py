@@ -31,9 +31,9 @@ copyright: str = "Jerilyn Franz, 2025"  # pylint: disable=redefined-builtin
 author: str = "Jerilyn Franz, <opensource@snowhare.com>"
 
 # The short X.Y version
-version: str = "1.2.0"
+version: str = "1.4.0"
 # The full version, including alpha/beta/rc tags
-release: str = "1.2.0-beta"
+release: str = "1.4.0"
 
 
 # -- General configuration ---------------------------------------------------

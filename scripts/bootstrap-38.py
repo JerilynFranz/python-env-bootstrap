@@ -8,10 +8,16 @@ in later versions of Python, so it is kept separate to ensure compatibility.
 It is NOT intended to be run with Python versions earlier than 3.8
 and will exit with an error if attempted.
 
-It has been tested with Python 3.8 through 3.14 as of December 2025.
+It has been tested with Python 3.8 through 3.14 as of January 2026.
 
 This script is part of the 'python-env-bootstrap' project available at
 https://github.com/JerilynFranz/python-env-bootstrap
+
+
+Note: THE POST_INSTALL ACTIONS AND MESSAGES TEMPLATES IN THIS SCRIPT
+      ARE EXAMPLES ONLY.
+
+      YOU MUST CUSTOMIZE THEM AS NEEDED FOR YOUR OWN PROJECT.
 
 License
 -------
@@ -43,8 +49,6 @@ the lowest supported version is Python 3.8.
 
 This example script installs the following tools by default:
 - uv (for managing Python packages and dependencies)
-- tox (for running tests, linters, and building documentation)
-- tox-uv (to integrate uv with tox)
 
 That is the minimum set of tools required to start development for this example project.
 
@@ -55,8 +59,9 @@ perform additional setup steps as needed via the run_post_install_steps() functi
 such as installing additional packages from requirements.txt files
 or configuring settings.
 
-The choices of installing 'uv' and 'tox' for the bootstrap are just examples;
-you can modify the BOOTSTRAP_MODULES list to only include any packages you need
+The choice of installing 'uv' for the bootstrap is because it is a modern
+package manager that can handle installing packages and managing dependencies.
+You can modify the BOOTSTRAP_MODULES list to only include any packages you need
 for your development bootstrap workflow.
 
 Settable Options
@@ -91,6 +96,8 @@ CLI Help
 
 """
 
+__version__ = '1.4.0'
+
 # pylint: disable=wrong-import-position
 import sys
 
@@ -98,7 +105,7 @@ import sys
 # this ensures that users get a clear error message if they try to run
 # the script with an unsupported Python version.
 #
-# The minimum version of Python this bootstrap script can support is 3.10+
+# The minimum version of Python this bootstrap script can support is 3.8+
 # This can be changed as needed for your project.
 if sys.version_info < (3, 8):
     major, minor = sys.version_info.major, sys.version_info.minor
@@ -110,11 +117,17 @@ import os
 import shutil
 import stat
 import subprocess
-from collections.abc import Callable
+from collections.abc import Callable, Set
 from functools import lru_cache as cache
 from pathlib import Path
 from typing import List, NamedTuple, Optional, Union
 from venv import create as create_venv
+
+
+def _is_windows() -> bool:
+    """Determines if the current platform is Windows."""
+    return sys.platform == 'win32'
+
 
 DEFAULT_DEBUG: bool = False
 """Enable debug output only if --debug is specified.
@@ -129,6 +142,16 @@ DEFAULT_QUIET: bool = False
 To enable quiet output by default, set this to True
 and then --verbose can be used to disable it.
 """
+
+# Whether to remove the bootstrapvirtual environment directory on script exit.
+# This is useful for cleaning up the bootstrap venv after installation
+# if desired. Set to False to keep the venv for inspection or reuse.
+#
+# Removing it on exit is not the default behavior to avoid accidental loss
+# of the created environment. But it can be enabled as needed.
+# Default is False because most users will want to keep the venv.
+REMOVE_BOOTSTRAP_VENV_ON_EXIT: bool = False
+"""Whether to remove the virtual environment directory on script exit."""
 
 VENV_DIR: str = '.venv'
 """The name of the virtual environment directory to create in the repository root for the bootstrap."""
@@ -157,8 +180,8 @@ class InstallSpec(NamedTuple):
 
 BOOTSTRAP_MODULES: List[InstallSpec] = [
     InstallSpec(name='uv', version='>=0.9.18'),
-    InstallSpec(name='tox', version='>=4.22.0'),
-    InstallSpec(name='tox-uv', version='>=1.13.1'),
+    # InstallSpec(name='tox', version='>=4.22.0'),
+    # InstallSpec(name='tox-uv', version='>=1.13.1'),
 ]
 
 # --- Tool usage instructions template ---
@@ -232,6 +255,21 @@ To deactivate the virtual environment, run:
 
 # --- Confirmation prompt message ---
 
+if _is_windows():
+    PLATFORM_PROMPT_MESSAGE = """
+************************************************************
+If you are using PowerShell, the script will attempt to set
+the execution policy to allow running scripts in the virtual
+environment. This is required to activate the virtual
+environment in PowerShell.
+
+The execution policy will be set only for the current user.
+************************************************************
+
+"""
+else:
+    PLATFORM_PROMPT_MESSAGE = ''
+
 CONFIRMATION_PROMPT_MESSAGE = f"""
 This script will create a {VENV_DIR} directory in the root
 of the current repository.
@@ -240,7 +278,10 @@ It will install required tools into it for development,
 and install the project as an editable package into the
 virtual environment.
 
-No changes will be made to your system install of Python.
+It will also install a git pre-commit hook for the repository.
+
+{PLATFORM_PROMPT_MESSAGE}
+No other changes will be made to your system install of Python.
 
 Continue? [y/n] """
 
@@ -254,6 +295,71 @@ DEBUG: bool = False
 QUIET: bool = False
 
 
+# --- Version Control System (VCS) Hook Names ---
+
+# Standard Git and Mercurial hook names. If you need custom hooks,
+# you can modify these sets as needed. Only names included in these
+# sets will be installed by the install_vcs_hooks() function.
+GIT_HOOK_NAMES = {
+    'applypatch-msg',
+    'commit-msg',
+    'fsmonitor-watchman',
+    'post-update',
+    'pre-applypatch',
+    'pre-commit',
+    'pre-merge-commit',
+    'pre-push',
+    'pre-rebase',
+    'pre-receive',
+    'prepare-commit-msg',
+    'update',
+}
+
+HG_HOOK_NAMES = {
+    'precommit',
+    'commit',
+    'prepush',
+    'push',
+    'preupdate',
+    'update',
+    'prechangegroup',
+    'changegroup',
+    'pretag',
+    'tag',
+}
+
+
+class VCS(NamedTuple):
+    """Specification for version control systems.
+
+    :param str name: The name of the VCS (e.g., 'git', 'hg', 'none').
+    """
+
+    name: str
+    repo_root: Union[Path, None] = None
+
+    def is_git(self) -> bool:
+        """Returns True if the VCS is git."""
+        return self.name == 'git'
+
+    def is_hg(self) -> bool:
+        """Returns True if the VCS is Mercurial."""
+        return self.name == 'hg'
+
+    def is_none(self) -> bool:
+        """Returns True if no VCS is detected."""
+        return self.name == 'none'
+
+    def __str__(self) -> str:
+        return self.name
+
+
+DETECTED_VCS: VCS = VCS(name='none', repo_root=Path('.'))
+"""The detected version control system in use (git, hg, or none)."""
+
+_powershell_execution_policy_set: bool = False
+
+
 def run_post_install_steps(python_exe: Path, root_path: Path, bin_dir: Path) -> None:
     """Runs any post-installation steps required after installing tools.
 
@@ -264,20 +370,40 @@ def run_post_install_steps(python_exe: Path, root_path: Path, bin_dir: Path) -> 
     - Installing packages from requirements.txt files
     - Any other project-specific initialization
 
-    The default example implementation here runs 'tox devenv -e dev' to set up and activate
-    the development environment, and then installs the current project in editable mode
-    with 'uv pip install -e .'.
+    The example here installs the current project in editable mode with 'uv sync --all-groups'.
 
     :param python_exe Path: The path to the Python executable within the venv.
     :param root_path Path: The path to the root of the repository.
     """
     _validate_path(python_exe, 'python_exe', exists=True)
     _validate_path(root_path, 'root_path', exists=True)
+
+    # This assumes 'uv' is installed in the bootstrap virtual environment
+    # and that there is a pyproject.toml file configured for the project.
+
+    # This has the effect of setting up the development environment and installing
+    # the project in editable mode.
+
+    # Alternatives include installing from requirements.txt files or other setup steps.
+    # run_command([...]) can be used to run any commands needed.
+
+    # python_exe is the Python executable in the venv and bin_dir is the venv's bin/Scripts directory.
+
+    # Example implementations (assuming you are not deleting the venv right after):
+
+    # run_command([python_exe, '-m', 'pip', 'install', '-r', 'requirements.txt'], cwd=root_path, check=True)
+
+    # Example of running 'tox devenv -e dev' to set up and activate the development environment
+
     # controlled_print("--> Running initial 'tox devenv -e dev' to setup and activate the development environment...")
     # run_command([python_exe, str(bin_dir / 'tox'), 'devenv', '-e', 'dev'], cwd=root_path, check=True)
-    controlled_print('--> Installing the current project in editable mode within the development environment...')
-    run_command([bin_dir / 'uv', 'pip', 'install', '-e', '.'], cwd=root_path, check=True)
-    run_command([bin_dir / 'uv', 'sync'], cwd=root_path, check=True)
+
+    # Example of installing the current project in editable mode using 'uv sync --all-groups'
+    controlled_print('--> Installing the current project and syncing all dependency groups...')
+    # We use --all-groups to ensure 'tools' (tox), 'test', etc. defined in
+    # pyproject.toml are installed. uv sync also handles installing the
+    # project itself in editable mode.
+    run_command([bin_dir / 'uv', 'sync', '--all-groups'], cwd=root_path, check=True)
 
 
 class FatalBootstrapError(Exception):
@@ -286,11 +412,6 @@ class FatalBootstrapError(Exception):
     def __init__(self, message: str, error_code: int = 1) -> None:
         super().__init__(message)
         self.error_code = error_code
-
-
-def _is_windows() -> bool:
-    """Determines if the current platform is Windows."""
-    return sys.platform == 'win32'
 
 
 def _validate_string(value: str, name: str) -> None:
@@ -471,29 +592,288 @@ def get_repo_root() -> Path:
 
     If a .git directory is not found, it looks for a Mercurial repository
     by searching for a '.hg' folder instead.
+
+    :raises FatalBootstrapError: If no repository is found.
     """
+    global DETECTED_VCS  # pylint: disable=global-statement
     try:
         git_root_bytes = subprocess.check_output(['git', 'rev-parse', '--show-toplevel'], stderr=subprocess.PIPE)
-        return Path(git_root_bytes.decode('utf-8').strip())
+        root_dir = git_root_bytes.decode('utf-8').strip()
+        DETECTED_VCS = VCS(name='git', repo_root=Path(root_dir))
+        return Path(root_dir)
     except (FileNotFoundError, subprocess.CalledProcessError):
         # Try Mercurial CLI
         try:
             hg_root_bytes = subprocess.check_output(['hg', 'root'], stderr=subprocess.PIPE)
-            return Path(hg_root_bytes.decode('utf-8').strip())
+            root_dir = hg_root_bytes.decode('utf-8').strip()
+            DETECTED_VCS = VCS(name='hg', repo_root=Path(root_dir))
+            return Path(root_dir)
         except (FileNotFoundError, subprocess.CalledProcessError):
             # Fallback to directory search...
             current_dir = Path.cwd()
             for parent in [current_dir] + list(current_dir.parents):
                 if (parent / '.git').is_dir():
+                    DETECTED_VCS = VCS(name='git', repo_root=parent)
                     return parent
 
             # Check for Mercurial repository instead
             for parent in [current_dir] + list(current_dir.parents):
                 if (parent / '.hg').is_dir():
+                    DETECTED_VCS = VCS(name='hg', repo_root=parent)
                     return parent
 
             controlled_print('Error: No Git or Mercurial repository found in any parent directories.')
             raise FatalBootstrapError('No repository found.', error_code=1)  # noqa: B904
+
+
+def install_vcs_hooks(repo_root: Path, forced: bool) -> None:
+    """Install pre-commit and pre-push hooks for git or hg if present.
+
+    It uses the 'hooks/' directory in the repository root
+    to find the hook scripts to install to the auto-detected VCS
+    metadata directory.
+
+    :param repo_root Path: The root directory of the repository.
+    :param forced bool: Whether to force overwrite of existing hooks.
+    """
+    _validate_path(repo_root, 'repo_root', exists=True)
+
+    if DETECTED_VCS.is_none():
+        controlled_print('No version control system detected; skipping VCS hook installation.')
+        return
+
+    hooks_dir = repo_root / 'hooks'
+    if not hooks_dir.exists():
+        controlled_print('No hooks/ directory found; skipping VCS hook installation.')
+        return
+
+    if DETECTED_VCS.is_git():
+        _install_git_hooks(repo_root, forced)
+    elif DETECTED_VCS.is_hg():
+        _install_hg_hooks(repo_root, forced)
+    else:
+        controlled_print('Unsupported VCS for hook installation; skipping.')
+
+
+def _is_valid_git_hook_name(name: str) -> bool:
+    """Checks if the given name is a valid Git hook name.
+
+    :param name str: The hook name to check.
+    :return bool: True if valid, False otherwise.
+    """
+    return name in GIT_HOOK_NAMES
+
+
+def _is_valid_hg_hook_name(name: str) -> bool:
+    """Checks if the given name is a valid Mercurial hook name.
+
+    :param name str: The hook name to check.
+    :return bool: True if valid, False otherwise.
+    """
+    return name in HG_HOOK_NAMES
+
+
+def _install_git_hooks(repo_root: Path, forced: bool) -> None:
+    """Installs git hooks from the 'hooks/' directory in the repository root.
+
+    :param repo_root Path: The root directory of the repository.
+    :param forced bool: Whether to force overwrite existing hooks.
+    """
+    _validate_path(repo_root, 'repo_root', exists=True)
+
+    git_dir = repo_root / '.git'
+    hooks_dir = git_dir / 'hooks'
+    source_hooks_dir = repo_root / 'hooks'
+
+    if not source_hooks_dir.exists():
+        controlled_print('No hooks/ directory found; skipping Git hook installation.')
+        return
+
+    if not hooks_dir.exists():
+        controlled_print(f'Git hooks directory does not exist at {hooks_dir}; creating it.')
+        try:
+            hooks_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            controlled_print(f'Error: Could not create Git hooks directory at {hooks_dir}: {e}')
+            controlled_print('Skipping Git hooks installation.')
+            return
+
+    try:
+        for hook_file in source_hooks_dir.iterdir():
+            if hook_file.is_file():
+                hook_name = hook_file.name
+                if not _is_valid_git_hook_name(hook_name):
+                    controlled_print(f'Skipping non-standard Git hook: {hook_name}')
+                    continue
+                dest_hook = hooks_dir / hook_file.name
+                if dest_hook.exists():
+                    if forced:
+                        controlled_print(f'Overwriting existing git hook: {dest_hook}')
+                    else:
+                        controlled_print(f'Git hook already exists, skipping: {dest_hook}')
+                        continue
+                try:
+                    shutil.copy2(hook_file, dest_hook)
+                except Exception as e:
+                    controlled_print(f'Error: Could not copy hook {hook_file} to {dest_hook}: {e}')
+                    controlled_print('Skipping this hook.')
+                    continue
+                try:
+                    dest_hook.chmod(dest_hook.stat().st_mode | stat.S_IEXEC)
+                except Exception:
+                    controlled_print(f'Warning: Could not set executable permission for {dest_hook}')
+                controlled_print(f'Installed git hook: {dest_hook}')
+    except Exception as e:
+        controlled_print(f'Error while installing Git hooks: {e}')
+        controlled_print('Skipping Git hooks installation. Some hooks may not be installed.')
+
+
+def _install_hg_hooks(repo_root: Path, forced: bool) -> None:
+    """Installs Mercurial hooks from the 'hooks/' directory in the repository root.
+
+    :param repo_root Path: The root directory of the repository.
+    :param forced bool: Whether to force overwrite existing hooks.
+    """
+    _validate_path(repo_root, 'repo_root', exists=True)
+
+    hg_dir = repo_root / '.hg'
+    hgrc_file = hg_dir / 'hgrc'
+    source_hooks_dir = repo_root / 'hooks'
+    relative_hooks_path = '../hooks'
+
+    if not source_hooks_dir.exists():
+        controlled_print('No hooks/ directory found; skipping Mercurial hook installation.')
+        return
+
+    try:
+        if not hgrc_file.exists():
+            controlled_print(f'No hgrc file found at {hgrc_file}; creating a new one.')
+            hgrc_file.touch()
+    except Exception as e:
+        controlled_print(f'Error: Could not create hgrc file at {hgrc_file}: {e}')
+        controlled_print('Skipping Mercurial hooks installation.')
+        return
+
+    try:
+        installed_hooks: Set = _already_installed_hg_hooks(repo_root)
+        hook_entries = []
+        hook_names = set()
+        for hook_file in source_hooks_dir.iterdir():
+            if hook_file.is_file():
+                hook_name = hook_file.name
+                if not _is_valid_hg_hook_name(hook_name):
+                    controlled_print(f'Skipping non-standard Mercurial hook: {hook_name}')
+                    continue
+                if hook_name in installed_hooks and not forced:
+                    controlled_print(f'Mercurial hook already configured, skipping: {hook_name}')
+                    continue
+                hook_entries.append(f'{hook_name} = {relative_hooks_path}/{hook_name}\n')
+                hook_names.add(hook_name)
+    except Exception as e:
+        controlled_print(f'Error while preparing Mercurial hooks: {e}')
+        controlled_print('Skipping Mercurial hooks installation.')
+        return
+
+    if not hook_entries:
+        controlled_print('No Mercurial hooks to install; skipping.')
+        return
+
+    try:
+        uniquifier = 1
+        new_hgrc_file = hgrc_file.with_name(hgrc_file.name + f'new_{uniquifier}')
+        while new_hgrc_file.exists():
+            uniquifier += 1
+            new_hgrc_file = hgrc_file.with_name(hgrc_file.name + f'new_{uniquifier}')
+
+        if hook_entries:
+            hgrc_content: List[str] = hgrc_file.read_text().splitlines(keepends=True)
+            found_hooks_section = False
+            with new_hgrc_file.open('w') as hgrc:
+                in_hooks_section = False
+                for line in hgrc_content:
+                    # Find [hooks] section
+                    stripped_line = line.strip()
+                    if stripped_line.startswith('[hooks]'):
+                        in_hooks_section = True
+                        found_hooks_section = True
+                        hgrc.write(line)
+                        continue
+
+                    # Process lines in [hooks] section
+                    if in_hooks_section:
+                        # end of [hooks] section
+                        if stripped_line.startswith('[') and stripped_line.endswith(']'):
+                            in_hooks_section = False
+                            # Add any remaining hooks before leaving section
+                            for name in hook_names:
+                                hgrc.write(f'{name} = {relative_hooks_path}/{name}\n')
+
+                        # A hook entry
+                        elif '=' in line:
+                            hook_name_key, hook_file_value = line.split('=', 1)
+                            hook_name_key = hook_name_key.strip()
+                            if hook_name_key in hook_names:
+                                hook_names.remove(hook_name_key)
+                                if forced:
+                                    controlled_print(f'Overwriting existing Mercurial hook: {hook_name_key}')
+                                    line = f'{hook_name_key} = {relative_hooks_path}/{hook_name_key}\n'
+                                else:
+                                    controlled_print(f'Mercurial hook already configured, skipping: {hook_name_key}')
+                    hgrc.write(line)
+
+                # If no [hooks] section was found, add it at the end
+                if not found_hooks_section:
+                    hgrc.write('[hooks]\n')
+                    hgrc.writelines(hook_entries)
+
+            # Replace original hgrc with new one (backup original)
+            backup_suffix = '.bak.'
+            backup_uniquifier = 1
+            backup_file = hgrc_file.with_name(hgrc_file.name + f'{backup_suffix}{backup_uniquifier}')
+            while backup_file.exists():
+                backup_uniquifier += 1
+                backup_file = hgrc_file.with_name(hgrc_file.name + f'{backup_suffix}{backup_uniquifier}')
+            shutil.copy2(hgrc_file, backup_file)
+            shutil.move(str(new_hgrc_file), str(hgrc_file))
+
+    except Exception as e:
+        controlled_print(f'Error while installing Mercurial hooks: {e}')
+        controlled_print('Skipping Mercurial hooks installation.')
+        return
+
+    controlled_print(f'Configured Mercurial hooks in {hgrc_file}')
+
+
+def _already_installed_hg_hooks(repo_root: Path) -> Set:
+    """Returns a set of already installed Mercurial hook names from hgrc.
+
+    :param repo_root Path: The root directory of the repository.
+    :return set[str]: A set of installed hook names.
+    """
+    _validate_path(repo_root, 'repo_root', exists=True)
+
+    hg_dir: Path = repo_root / '.hg'
+    hgrc_file: Path = hg_dir / 'hgrc'
+    installed_hooks: set = set()
+
+    if not hgrc_file.exists():
+        return installed_hooks
+
+    with hgrc_file.open('r') as hgrc:
+        in_hooks_section = False
+        for line in hgrc:
+            line = line.strip()
+            if line.startswith('[hooks]'):
+                in_hooks_section = True
+                continue
+            if in_hooks_section:
+                if line.startswith('[') and line.endswith(']'):
+                    break  # End of hooks section
+                if '=' in line:
+                    hook_name = line.split('=')[0].strip()
+                    installed_hooks.add(hook_name)
+
+    return installed_hooks
 
 
 def path_to_venv_python(venv_dir: Path) -> Path:
@@ -524,13 +904,18 @@ def pip_module_is_available(python_exe: Path) -> bool:
     try:
         if DEBUG:
             controlled_print(f"DEBUG: Running '{python_exe} -m pip --version' to check for pip availability")
-        subprocess.run([python_exe, '-m', 'pip', '--version'], check=True, stdout=stdout, stderr=stderr)
+        subprocess.run(
+            [python_exe, '-m', 'pip', '--version'],
+            check=True,
+            stdout=stdout,
+            stderr=stderr,
+        )
         return True
     except (FileNotFoundError, subprocess.CalledProcessError):
         return False
 
 
-def create_temporary_virtual_environment(venv_dir: Path, python_exe: Path) -> None:
+def create_virtual_environment(venv_dir: Path, python_exe: Path) -> None:
     """
     Creates a virtual environment at the specified directory.
     If the directory already exists, it skips creation.
@@ -541,7 +926,7 @@ def create_temporary_virtual_environment(venv_dir: Path, python_exe: Path) -> No
     _validate_path(python_exe, 'python_exe', exists=False)
 
     if not venv_dir.exists():
-        controlled_print(f"Creating temporary virtual environment in '{venv_dir}'...")
+        controlled_print(f"Creating virtual environment in '{venv_dir}'...")
         create_venv(venv_dir, with_pip=True)
         controlled_print('---> Ensuring pip CLI script is installed in the virtual environment...')
         run_command([python_exe, '-m', 'ensurepip', '--upgrade'])
@@ -555,18 +940,28 @@ def create_temporary_virtual_environment(venv_dir: Path, python_exe: Path) -> No
                 raise FatalBootstrapError("'pip' not available in virtual environment.", error_code=1)
             run_command([pip_path, 'install', '--upgrade', 'pip'])
         else:
-            run_command([python_exe, '-m', 'pip', 'install', '--upgrade', 'pip', '--require-virtualenv'])
+            run_command(
+                [
+                    python_exe,
+                    '-m',
+                    'pip',
+                    'install',
+                    '--upgrade',
+                    'pip',
+                    '--require-virtualenv',
+                ]
+            )
     else:
         controlled_print(f"Virtual environment '{venv_dir}' already exists. Skipping creation.")
 
 
-def remove_temporary_virtual_environment(venv_dir: Path, quiet: bool = False) -> None:
-    """Removes the temporary virtual environment directory.
+def remove_virtual_environment(venv_dir: Path, quiet: bool = False) -> None:
+    """Removes the virtual environment directory.
 
     :param venv_dir Path: The directory of the virtual environment to remove.
     """
     if not quiet:
-        controlled_print(f"Removing temporary virtual environment at '{venv_dir}'...")
+        controlled_print(f"Removing virtual environment at '{venv_dir}'...")
     if venv_dir.exists():
         if sys.version_info >= (3, 12):
             shutil.rmtree(venv_dir, onexc=_remove_readonly)  # type: ignore[arg-type]
@@ -574,7 +969,7 @@ def remove_temporary_virtual_environment(venv_dir: Path, quiet: bool = False) ->
             shutil.rmtree(venv_dir, onerror=_remove_readonly)
 
 
-def _remove_readonly(func: Callable[[Union[Path, str]], None], path: Union[str, Path], _: object) -> None:
+def _remove_readonly(func: Callable, path: Union[str, Path], _: object) -> None:
     "Clear the readonly bit and reattempt the removal"
     os.chmod(path, stat.S_IWRITE)
     func(path)
@@ -667,6 +1062,49 @@ def _build_install_command(base_command: List[Union[str, Path]], modules: List[I
     return command
 
 
+def set_powershell_execution_policy() -> None:
+    """Sets the PowerShell execution policy to RemoteSigned for the current user if on Windows."""
+    if not _is_windows():
+        return
+
+    controlled_print('--> Configuring PowerShell execution policy...')
+    try:
+        global _powershell_execution_policy_set  # pylint: disable=global-statement
+
+        # Check current policy
+        check_command = ['powershell', '-Command', 'Get-ExecutionPolicy']
+        result = subprocess.run(check_command, capture_output=True, text=True, check=False)
+        current_policy = result.stdout.strip()
+
+        if current_policy == 'RemoteSigned':
+            controlled_print('PowerShell execution policy is already set to RemoteSigned.')
+            _powershell_execution_policy_set = True
+            return
+
+        controlled_print('Setting PowerShell execution policy to RemoteSigned for the current user.')
+        # This command requires user confirmation if run interactively in a PS prompt,
+        # but it should proceed without a prompt when called via subprocess from a non-interactive script.
+        # Using -Force to be certain.
+        set_command: List[Union[str, Path]] = [
+            'powershell',
+            '-Command',
+            'Set-ExecutionPolicy',
+            '-ExecutionPolicy',
+            'RemoteSigned',
+            '-Scope',
+            'CurrentUser',
+            '-Force',
+        ]
+        run_command(set_command)
+        controlled_print('PowerShell execution policy has been set to RemoteSigned.')
+        _powershell_execution_policy_set = True
+
+    except (subprocess.CalledProcessError, FileNotFoundError, FatalBootstrapError) as e:
+        controlled_print(f'Warning: Failed to set PowerShell execution policy: {e}')
+        controlled_print('You may need to run the following command in PowerShell manually:')
+        controlled_print('Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser')
+
+
 def print_instructions(template: str) -> None:
     """Prints instructions to the user on how to activate the virtual environment
     and use the installed tools.
@@ -675,10 +1113,31 @@ def print_instructions(template: str) -> None:
     """
     _validate_string(template, 'template')
 
-    activate_script = f'source {ACTIVATED_VENV_DIR}/bin/activate'
-    if _is_windows():
-        activate_script = f'{ACTIVATED_VENV_DIR}\\Scripts\\activate.bat'
+    activate_script = f"""
+Unix/macOS/Linux:
 
+    source {ACTIVATED_VENV_DIR}/bin/activate
+
+If you use fish:
+
+    source {ACTIVATED_VENV_DIR}/bin/activate.fish
+"""
+
+    if _is_windows():
+        activate_script = f"""
+Windows Command Prompt:
+
+    {ACTIVATED_VENV_DIR}\\Scripts\\activate
+
+PowerShell:
+
+    {ACTIVATED_VENV_DIR}\\Scripts\\Activate.ps1
+
+Note: For PowerShell, you may need to adjust your execution policy to run scripts.
+You can do this by running PowerShell and executing:
+
+    Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+"""
     instructions = template.format(activate=activate_script)
     controlled_print(instructions)
 
@@ -690,7 +1149,10 @@ def parse_arguments() -> argparse.Namespace:
         'virtual environment and installing required tools.'
     )
     arg_parser.add_argument(
-        '--yes', '-y', action='store_true', help='Automatically confirm and proceed without prompting.'
+        '--yes',
+        '-y',
+        action='store_true',
+        help='Automatically confirm and proceed without prompting.',
     )
 
     debug_group = arg_parser.add_mutually_exclusive_group()
@@ -699,9 +1161,27 @@ def parse_arguments() -> argparse.Namespace:
 
     # Mutually exclusive group for verbosity
     verbosity_group = arg_parser.add_mutually_exclusive_group()
-    verbosity_group.add_argument('-q', '--quiet', dest='quiet', action='store_true', help='Suppress non-error output.')
     verbosity_group.add_argument(
-        '-v', '--verbose', dest='quiet', action='store_false', help='Enable verbose output (default).'
+        '-q',
+        '--quiet',
+        '--ci',
+        dest='quiet',
+        action='store_true',
+        help='Suppress non-error output. This is useful for CI environments.',
+    )
+    verbosity_group.add_argument(
+        '-v',
+        '--verbose',
+        dest='quiet',
+        action='store_false',
+        help='Enable verbose output (default).',
+    )
+
+    # Forced hook installation option
+    arg_parser.add_argument(
+        '--force-hooks',
+        action='store_true',
+        help='Force overwrite of existing VCS hooks during installation.',
     )
     arg_parser.set_defaults(quiet=DEFAULT_QUIET, debug=DEFAULT_DEBUG)
 
@@ -723,34 +1203,43 @@ def main() -> None:
     if not args.yes and not confirmation_prompt(CONFIRMATION_PROMPT_MESSAGE):
         print('Aborted by user.')
         sys.exit(0)
+
     try:
         repo_root = get_repo_root()
 
         controlled_print(f'--- Bootstrapping development environment (in {repo_root}) ---')
 
         venv_dir = repo_root / VENV_DIR
+    except FatalBootstrapError as e:
+        controlled_print(f'Fatal error during bootstrap: {e}')
+        sys.exit(e.error_code)
+
+    try:
         python_exe = path_to_venv_python(venv_dir)
-        create_temporary_virtual_environment(venv_dir, python_exe)
+        create_virtual_environment(venv_dir, python_exe)
         install_tools(python_exe, BOOTSTRAP_MODULES)
+        install_vcs_hooks(repo_root, forced=args.force_hooks)
+        set_powershell_execution_policy()
 
         bin_dir = venv_dir / ('Scripts' if _is_windows() else 'bin')
         run_post_install_steps(python_exe=python_exe, root_path=repo_root, bin_dir=bin_dir)
-        remove_temporary_virtual_environment(venv_dir)
+        if REMOVE_BOOTSTRAP_VENV_ON_EXIT:
+            remove_virtual_environment(venv_dir)
         print_instructions(POST_INSTALL_MESSAGE)
 
     except KeyboardInterrupt:
-        remove_temporary_virtual_environment(venv_dir, quiet=True)
+        remove_virtual_environment(venv_dir, quiet=True)
         controlled_print('')
         controlled_print('Aborted by user.')
         sys.exit(2)
 
     except FatalBootstrapError as e:
-        remove_temporary_virtual_environment(venv_dir, quiet=True)
+        remove_virtual_environment(venv_dir, quiet=True)
         controlled_print(f'Fatal error during bootstrap: {e}')
         sys.exit(e.error_code)
 
     except Exception as e:
-        remove_temporary_virtual_environment(venv_dir, quiet=True)
+        remove_virtual_environment(venv_dir, quiet=True)
         controlled_print(f'Fatal error during bootstrap: {e}')
         sys.exit(1)
 

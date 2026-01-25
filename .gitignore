@@ -6,6 +6,13 @@ __pycache__/
 # C extensions
 *.so
 
+# MacOS
+*.dmg
+*.pkg
+*.mpkg
+.DS_Store
+._DS_Store
+
 # Documentation build files
 documentation/
 
